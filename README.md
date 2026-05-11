@@ -70,7 +70,7 @@ Reliable cross-device note continuity without adding complex workflow overhead.
 
 ### Quick Demo
 
-![QuickNotes Demo](resources/NoteHub.gif)
+![QuickNotes Demo](resources/QuickNote.gif)
 
 ---
 
