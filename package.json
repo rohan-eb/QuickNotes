@@ -1,0 +1,378 @@
+{
+  "name": "quicknotes",
+  "displayName": "QuickNotes",
+  "description": "A lightweight synced markdown notebook for developers inside VS Code.",
+  "version": "0.0.1",
+  "publisher": "rohanvadsola",
+  "icon": "media/marketplace.png",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rohan-eb/QuickNotes"
+  },
+  "homepage": "https://github.com/rohan-eb/QuickNotes",
+  "bugs": {
+    "url": "https://github.com/rohan-eb/QuickNotes/issues"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "notes",
+    "markdown",
+    "developer",
+    "github",
+    "sync"
+  ],
+  "activationEvents": [
+    "onView:devnotes.sidebar",
+    "onCommand:devnotes.connectAccount",
+    "onCommand:devnotes.accountMenu",
+    "onCommand:devnotes.switchAccount",
+    "onCommand:devnotes.disconnectAccount",
+    "onCommand:devnotes.continueLocalOnly",
+    "onCommand:devnotes.connectGitHub",
+    "onCommand:devnotes.setupNoteHub",
+    "onCommand:devnotes.createNote",
+    "onCommand:devnotes.createNoteQuick",
+    "onCommand:devnotes.createSyncedNote",
+    "onCommand:devnotes.createLocalNote",
+    "onCommand:devnotes.duplicateNote",
+    "onCommand:devnotes.noteActions",
+    "onCommand:devnotes.revealNoteInFolder",
+    "onCommand:devnotes.copyNotePath",
+    "onCommand:devnotes.moveNoteToSynced",
+    "onCommand:devnotes.moveNoteToLocal",
+    "onCommand:devnotes.openNotesFolder",
+    "onCommand:devnotes.syncNotes",
+    "onCommand:devnotes.syncStatus",
+    "onCommand:devnotes.restoreNotes",
+    "onCommand:devnotes.resetSyncedWarning",
+    "onCommand:devnotes.refreshNotes"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "devnotes",
+          "title": "QuickNotes",
+          "icon": "media/notehub-white.svg"
+        }
+      ]
+    },
+    "views": {
+      "devnotes": [
+        {
+          "id": "devnotes.sidebar",
+          "name": "NOTES"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "devnotes.accountMenu",
+        "title": "Developer Notes: Account",
+        "icon": "$(account)"
+      },
+      {
+        "command": "devnotes.connectAccount",
+        "title": "Developer Notes: Connect Account"
+      },
+      {
+        "command": "devnotes.switchAccount",
+        "title": "Developer Notes: Switch Account"
+      },
+      {
+        "command": "devnotes.disconnectAccount",
+        "title": "Developer Notes: Disconnect Account"
+      },
+      {
+        "command": "devnotes.continueLocalOnly",
+        "title": "Developer Notes: Continue Local Only"
+      },
+      {
+        "command": "devnotes.connectGitHub",
+        "title": "Developer Notes: Connect GitHub"
+      },
+      {
+        "command": "devnotes.setupNoteHub",
+        "title": "Developer Notes: Setup NoteHub"
+      },
+      {
+        "command": "devnotes.createNote",
+        "title": "Developer Notes: Create Note"
+      },
+      {
+        "command": "devnotes.createNoteQuick",
+        "title": "Developer Notes: Create Note",
+        "icon": "$(add)"
+      },
+      {
+        "command": "devnotes.createSyncedNote",
+        "title": "Developer Notes: Create Synced Note"
+      },
+      {
+        "command": "devnotes.createLocalNote",
+        "title": "Developer Notes: Create Local Note"
+      },
+      {
+        "command": "devnotes.openNote",
+        "title": "Developer Notes: Open Note"
+      },
+      {
+        "command": "devnotes.renameNote",
+        "title": "Developer Notes: Rename Note"
+      },
+      {
+        "command": "devnotes.duplicateNote",
+        "title": "Developer Notes: Duplicate Note"
+      },
+      {
+        "command": "devnotes.noteActions",
+        "title": "Developer Notes: Note Actions",
+        "icon": "$(ellipsis)"
+      },
+      {
+        "command": "devnotes.deleteNote",
+        "title": "Developer Notes: Delete Note"
+      },
+      {
+        "command": "devnotes.revealNoteInFolder",
+        "title": "Developer Notes: Reveal Note In Folder"
+      },
+      {
+        "command": "devnotes.copyNotePath",
+        "title": "Developer Notes: Copy Note Path"
+      },
+      {
+        "command": "devnotes.moveNoteToSynced",
+        "title": "Developer Notes: Move Note To Synced"
+      },
+      {
+        "command": "devnotes.moveNoteToLocal",
+        "title": "Developer Notes: Move Note To Local"
+      },
+      {
+        "command": "devnotes.openNotesFolder",
+        "title": "Developer Notes: Open Notes Folder"
+      },
+      {
+        "command": "devnotes.syncNotes",
+        "title": "Developer Notes: Sync Notes"
+      },
+      {
+        "command": "devnotes.syncStatus",
+        "title": "Developer Notes: Sync Status"
+      },
+      {
+        "command": "devnotes.restoreNotes",
+        "title": "Developer Notes: Restore Notes"
+      },
+      {
+        "command": "devnotes.resetSyncedWarning",
+        "title": "Developer Notes: Reset Synced Privacy Warning"
+      },
+      {
+        "command": "devnotes.refreshNotes",
+        "title": "Developer Notes: Refresh",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "devnotes.createNoteQuick",
+          "when": "view == devnotes.sidebar",
+          "group": "navigation@1"
+        },
+        {
+          "command": "devnotes.refreshNotes",
+          "when": "view == devnotes.sidebar",
+          "group": "navigation@2"
+        },
+        {
+          "command": "devnotes.accountMenu",
+          "when": "view == devnotes.sidebar",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "devnotes.switchAccount",
+          "when": "view == devnotes.sidebar && viewItem == accountItem",
+          "group": "navigation@1"
+        },
+        {
+          "command": "devnotes.disconnectAccount",
+          "when": "view == devnotes.sidebar && viewItem == accountItem",
+          "group": "navigation@2"
+        },
+        {
+          "command": "devnotes.noteActions",
+          "when": "view == devnotes.sidebar && (viewItem == noteItem.synced || viewItem == noteItem.local)",
+          "group": "inline@1"
+        },
+        {
+          "command": "devnotes.createNote",
+          "when": "view == devnotes.sidebar && viewItem == sectionItem.synced",
+          "group": "inline"
+        },
+        {
+          "command": "devnotes.createNote",
+          "when": "view == devnotes.sidebar && viewItem == sectionItem.local",
+          "group": "inline"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "devnotes.openNote",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.renameNote",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.deleteNote",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.createSyncedNote",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.createLocalNote",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.connectGitHub",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.setupNoteHub",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.accountMenu",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.copyNotePath",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.noteActions",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.resetSyncedWarning",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.moveNoteToSynced",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.moveNoteToLocal",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Developer Notes",
+      "properties": {
+        "devnotes.autoSync": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable automatic sync workflow."
+        },
+        "devnotes.syncOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Sync notes when VS Code starts."
+        },
+        "devnotes.syncOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Sync notes when a note file is saved."
+        },
+        "devnotes.notesPath": {
+          "type": "string",
+          "default": "~/.devnotes",
+          "description": "Deprecated alias for synced notes path."
+        },
+        "devnotes.syncedNotesPath": {
+          "type": "string",
+          "default": "~/.devnotes",
+          "description": "Base path where account-scoped synced notes are stored."
+        },
+        "devnotes.activeAccountKey": {
+          "type": "string",
+          "default": "",
+          "description": "Internal account scope key used to isolate synced notes per connected account."
+        },
+        "devnotes.localNotesPath": {
+          "type": "string",
+          "default": "~/.devnotes-local",
+          "description": "Path where local-only notes are stored."
+        },
+        "devnotes.defaultNoteSpace": {
+          "type": "string",
+          "enum": [
+            "local",
+            "synced"
+          ],
+          "default": "local",
+          "description": "Default target for newly created notes."
+        },
+        "devnotes.localOnlyMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "When enabled, QuickNotes keeps notes local and disables sync."
+        },
+        "devnotes.repoName": {
+          "type": "string",
+          "default": "devnotes-sync",
+          "description": "GitHub repository name used for note sync."
+        },
+        "devnotes.repoOwner": {
+          "type": "string",
+          "default": "",
+          "description": "GitHub username or org that owns the notes repository. If empty, uses authenticated account label."
+        },
+        "devnotes.branch": {
+          "type": "string",
+          "default": "main",
+          "description": "Git branch used for syncing notes."
+        },
+        "devnotes.autoCreateRepo": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically create the notes repository if it does not exist in your GitHub account."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "pretest": "npm run compile && npm run lint",
+    "test": "echo \"No tests yet\"",
+    "package:vsix": "vsce package",
+    "publish:patch": "vsce publish patch"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.6.0",
+    "@types/node": "^20.14.10",
+    "@types/vscode": "^1.90.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.5.4"
+  }
+}

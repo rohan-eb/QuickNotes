@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+*.vsix
+out/
+coverage/
+*.tsbuildinfo
+
+# Local/dev tooling
+.vscode-test/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.log
+
+# Secrets/env
+.env
+.env.*
+!.env.example
+
+# Local app data
+.devnotes/
+.devnotes-local/
