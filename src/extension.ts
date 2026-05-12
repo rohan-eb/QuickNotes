@@ -149,7 +149,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
 
     if (syncOnStartup && autoSync && !localOnlyMode) {
-      void vscode.commands.executeCommand('devnotes.syncNotes');
+      void vscode.commands.executeCommand('devnotes.syncNotes', { silent: true });
     }
 
     logInfo('QuickNotes activated successfully');

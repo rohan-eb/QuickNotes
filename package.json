@@ -1,7 +1,7 @@
 {
   "name": "quicknotes",
-  "displayName": "QuickNotes",
-  "description": "A lightweight synced markdown notebook for developers inside VS Code.",
+  "displayName": "Quick Notes",
+  "description": "Quick Notes (QuickNotes) is a local-first VS Code notes extension with Markdown notes, private local notebooks, and optional GitHub sync.",
   "version": "0.0.1",
   "publisher": "rohanvadsola",
   "icon": "media/marketplace.png",
@@ -18,14 +18,23 @@
     "vscode": "^1.90.0"
   },
   "categories": [
+    "Productivity",
     "Other"
   ],
   "keywords": [
+    "quick notes",
+    "quicknotes",
+    "quicknote",
     "notes",
+    "notebook",
     "markdown",
-    "developer",
-    "github",
-    "sync"
+    "developer notes",
+    "vscode notes",
+    "github notes",
+    "sync notes",
+    "local first", 
+    "knowledge base",
+    "scratchpad"
   ],
   "activationEvents": [
     "onView:devnotes.sidebar",
@@ -75,110 +84,110 @@
     "commands": [
       {
         "command": "devnotes.accountMenu",
-        "title": "Developer Notes: Account",
+        "title": "Quick Notes: Account",
         "icon": "$(account)"
       },
       {
         "command": "devnotes.connectAccount",
-        "title": "Developer Notes: Connect Account"
+        "title": "Quick Notes: Connect Account"
       },
       {
         "command": "devnotes.switchAccount",
-        "title": "Developer Notes: Switch Account"
+        "title": "Quick Notes: Switch Account"
       },
       {
         "command": "devnotes.disconnectAccount",
-        "title": "Developer Notes: Disconnect Account"
+        "title": "Quick Notes: Disconnect Account"
       },
       {
         "command": "devnotes.continueLocalOnly",
-        "title": "Developer Notes: Continue Local Only"
+        "title": "Quick Notes: Continue Local Only"
       },
       {
         "command": "devnotes.connectGitHub",
-        "title": "Developer Notes: Connect GitHub"
+        "title": "Quick Notes: Connect GitHub"
       },
       {
         "command": "devnotes.setupNoteHub",
-        "title": "Developer Notes: Setup NoteHub"
+        "title": "Quick Notes: Setup NoteHub"
       },
       {
         "command": "devnotes.createNote",
-        "title": "Developer Notes: Create Note"
+        "title": "Quick Notes: Create Note"
       },
       {
         "command": "devnotes.createNoteQuick",
-        "title": "Developer Notes: Create Note",
+        "title": "Quick Notes: Create Note",
         "icon": "$(add)"
       },
       {
         "command": "devnotes.createSyncedNote",
-        "title": "Developer Notes: Create Synced Note"
+        "title": "Quick Notes: Create Synced Note"
       },
       {
         "command": "devnotes.createLocalNote",
-        "title": "Developer Notes: Create Local Note"
+        "title": "Quick Notes: Create Local Note"
       },
       {
         "command": "devnotes.openNote",
-        "title": "Developer Notes: Open Note"
+        "title": "Quick Notes: Open Note"
       },
       {
         "command": "devnotes.renameNote",
-        "title": "Developer Notes: Rename Note"
+        "title": "Quick Notes: Rename Note"
       },
       {
         "command": "devnotes.duplicateNote",
-        "title": "Developer Notes: Duplicate Note"
+        "title": "Quick Notes: Duplicate Note"
       },
       {
         "command": "devnotes.noteActions",
-        "title": "Developer Notes: Note Actions",
+        "title": "Quick Notes: Note Actions",
         "icon": "$(ellipsis)"
       },
       {
         "command": "devnotes.deleteNote",
-        "title": "Developer Notes: Delete Note"
+        "title": "Quick Notes: Delete Note"
       },
       {
         "command": "devnotes.revealNoteInFolder",
-        "title": "Developer Notes: Reveal Note In Folder"
+        "title": "Quick Notes: Reveal Note In Folder"
       },
       {
         "command": "devnotes.copyNotePath",
-        "title": "Developer Notes: Copy Note Path"
+        "title": "Quick Notes: Copy Note Path"
       },
       {
         "command": "devnotes.moveNoteToSynced",
-        "title": "Developer Notes: Move Note To Synced"
+        "title": "Quick Notes: Move Note To Synced"
       },
       {
         "command": "devnotes.moveNoteToLocal",
-        "title": "Developer Notes: Move Note To Local"
+        "title": "Quick Notes: Move Note To Local"
       },
       {
         "command": "devnotes.openNotesFolder",
-        "title": "Developer Notes: Open Notes Folder"
+        "title": "Quick Notes: Open Notes Folder"
       },
       {
         "command": "devnotes.syncNotes",
-        "title": "Developer Notes: Sync Notes"
+        "title": "Quick Notes: Sync Notes"
       },
       {
         "command": "devnotes.syncStatus",
-        "title": "Developer Notes: Sync Status"
+        "title": "Quick Notes: Sync Status"
       },
       {
         "command": "devnotes.restoreNotes",
-        "title": "Developer Notes: Restore Notes"
+        "title": "Quick Notes: Restore Notes"
       },
       {
         "command": "devnotes.resetSyncedWarning",
-        "title": "Developer Notes: Reset Synced Privacy Warning"
+        "title": "Quick Notes: Reset Synced Privacy Warning"
       },
       {
         "command": "devnotes.refreshNotes",
-        "title": "Developer Notes: Refresh",
+        "title": "Quick Notes: Refresh",
         "icon": "$(refresh)"
       }
     ],
@@ -283,7 +292,7 @@
       ]
     },
     "configuration": {
-      "title": "Developer Notes",
+      "title": "Quick Notes",
       "properties": {
         "devnotes.autoSync": {
           "type": "boolean",
@@ -314,6 +323,11 @@
           "type": "string",
           "default": "",
           "description": "Internal account scope key used to isolate synced notes per connected account."
+        },
+        "devnotes.activeAccountLabel": {
+          "type": "string",
+          "default": "",
+          "description": "Internal active GitHub account label selected by QuickNotes."
         },
         "devnotes.localNotesPath": {
           "type": "string",

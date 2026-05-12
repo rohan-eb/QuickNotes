@@ -1,45 +1,8 @@
-# QuickNotes
+# Quick Notes (QuickNotes)
 
-A lightweight VS Code notes extension for developers.
+Quick Notes is a local-first VS Code notes extension with Markdown notes, private local notebooks, and optional GitHub sync.
 
-QuickNotes helps you capture notes in Markdown, keep private notes local, and sync selected notes to a GitHub repository.
-
----
-
-## Product Overview
-
-QuickNotes is designed to be:
-
-- local-first
-- markdown-native
-- GitHub-backed
-- easy to restore on new machines
-- minimal to set up
-
-### Problem It Solves
-
-Developers create useful notes (debugging ideas, snippets, prompts, architecture thoughts), but those notes are usually spread across disconnected tools.
-
-That breaks development flow and makes notes hard to find when needed.
-
-### Vision
-
-Make note-taking feel native inside VS Code, so developers can write and access notes where they already work.
-
-### Core Value
-
-Reliable cross-device note continuity without adding complex workflow overhead.
-
----
-
-## Why QuickNotes
-
-- Keep notes inside VS Code where you already work
-- Separate `Synced Notes` and `Local Notes` clearly
-- Use account-level controls for sync privacy
-- Work offline and sync when connection is back
-
----
+![QuickNotes Demo](https://raw.githubusercontent.com/rohan-eb/QuickNotes/main/resources/QuickNote.gif)
 
 ## Features
 
@@ -66,11 +29,7 @@ Reliable cross-device note continuity without adding complex workflow overhead.
 
 ### Sidebar Overview
 
-![QuickNotes Sidebar](resources/Notes.png)
-
-### Quick Demo
-
-![QuickNotes Demo](resources/QuickNote.gif)
+![QuickNotes Sidebar](https://raw.githubusercontent.com/rohan-eb/QuickNotes/main/resources/Notes.png)
 
 ---
 
@@ -98,7 +57,7 @@ After installing QuickNotes, you can change the default sync repository name:
 1. Open VS Code Settings (`Ctrl+,`)
 2. Search for `devnotes.repoName`
 3. Set your preferred repository name (default is `devnotes-sync`)
-4. Run `Developer Notes: Sync Notes`
+4. Run `Quick Notes: Sync Notes`
 
 What happens if you change `devnotes.repoName` after already syncing notes:
 
@@ -112,15 +71,15 @@ What happens if you change `devnotes.repoName` after already syncing notes:
 
 ## Commands (User-facing)
 
-- `Developer Notes: Create Note`
-- `Developer Notes: Connect Account`
-- `Developer Notes: Switch Account`
-- `Developer Notes: Disconnect Account`
-- `Developer Notes: Continue Local Only`
-- `Developer Notes: Open Notes Folder`
-- `Developer Notes: Sync Notes`
-- `Developer Notes: Sync Status`
-- `Developer Notes: Restore Notes`
+- `Quick Notes: Create Note`
+- `Quick Notes: Connect Account`
+- `Quick Notes: Switch Account`
+- `Quick Notes: Disconnect Account`
+- `Quick Notes: Continue Local Only`
+- `Quick Notes: Open Notes Folder`
+- `Quick Notes: Sync Notes`
+- `Quick Notes: Sync Status`
+- `Quick Notes: Restore Notes`
 
 ---
 
@@ -155,12 +114,6 @@ Common settings:
 Currently supported:
 
 - GitHub provider flow
-
-Planned (future):
-
-- GitLab support
-- Bitbucket support
-- Additional provider options
 
 
 ---

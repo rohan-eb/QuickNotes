@@ -100,7 +100,7 @@ async function ensureRemoteRepositoryExists(
   config: RepoConfig
 ): Promise<void> {
   const token = session.accessToken;
-  const repoCheck = await githubRequest<{ private?: boolean }>(
+  let repoCheck = await githubRequest<{ private?: boolean }>(
     `https://api.github.com/repos/${config.owner}/${config.repoName}`,
     token
   );
@@ -122,9 +122,27 @@ async function ensureRemoteRepositoryExists(
 
   const accountLogin = config.accountLogin.trim().toLowerCase();
   if (config.owner.trim().toLowerCase() !== accountLogin) {
-    throw new Error(
-      `Cannot auto-create repo under ${config.owner}. Set devnotes.repoOwner to your account (${config.accountLogin}) or create repo manually.`
+    // Auto-heal stale/mismatched owner config so reconnecting with a different
+    // GitHub account does not block first-time sync.
+    const fallbackOwner = config.accountLogin.trim();
+    config.owner = fallbackOwner;
+    config.remoteUrl = `https://github.com/${fallbackOwner}/${config.repoName}.git`;
+    await vscode.workspace
+      .getConfiguration()
+      .update('devnotes.repoOwner', fallbackOwner, vscode.ConfigurationTarget.Global);
+
+    repoCheck = await githubRequest<{ private?: boolean }>(
+      `https://api.github.com/repos/${config.owner}/${config.repoName}`,
+      token
     );
+
+    if (repoCheck.status === 200) {
+      return;
+    }
+
+    if (repoCheck.status !== 404) {
+      throw new Error(`Unable to verify remote repository (${config.owner}/${config.repoName}).`);
+    }
   }
 
   const createResponse = await githubRequest(

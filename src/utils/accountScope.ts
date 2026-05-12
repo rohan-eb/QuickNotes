@@ -14,7 +14,7 @@ function sanitizeAccountKey(raw: string): string {
 }
 
 function toGitHubAccountKey(session: AuthenticationSession): string {
-  const base = session.account.id || session.account.label;
+  const base = session.account.label;
   return `github-${sanitizeAccountKey(base)}`;
 }
 
