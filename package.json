@@ -1,8 +1,8 @@
 {
   "name": "quicknotes",
-  "displayName": "Quick Notes",
+  "displayName": "QuickNotes",
   "description": "Quick Notes (QuickNotes) is a local-first VS Code notes extension with Markdown notes, private local notebooks, and optional GitHub sync.",
-  "version": "0.0.1",
+  "version": "0.0.4",
   "publisher": "rohanvadsola",
   "icon": "media/marketplace.png",
   "license": "MIT",
@@ -18,8 +18,8 @@
     "vscode": "^1.90.0"
   },
   "categories": [
-    "Productivity",
-    "Other"
+    "Other",
+    "Notebooks"
   ],
   "keywords": [
     "quick notes",
@@ -47,14 +47,21 @@
     "onCommand:devnotes.setupNoteHub",
     "onCommand:devnotes.createNote",
     "onCommand:devnotes.createNoteQuick",
+    "onCommand:devnotes.createFolderQuick",
     "onCommand:devnotes.createSyncedNote",
     "onCommand:devnotes.createLocalNote",
+    "onCommand:devnotes.createFolder",
+    "onCommand:devnotes.createSyncedFolder",
+    "onCommand:devnotes.createLocalFolder",
     "onCommand:devnotes.duplicateNote",
-    "onCommand:devnotes.noteActions",
+    "onCommand:devnotes.deleteFolder",
     "onCommand:devnotes.revealNoteInFolder",
     "onCommand:devnotes.copyNotePath",
+    "onCommand:devnotes.insertImageIntoNote",
     "onCommand:devnotes.moveNoteToSynced",
     "onCommand:devnotes.moveNoteToLocal",
+    "onCommand:devnotes.moveNoteToFolder",
+    "onCommand:devnotes.moveFolder",
     "onCommand:devnotes.openNotesFolder",
     "onCommand:devnotes.syncNotes",
     "onCommand:devnotes.syncStatus",
@@ -81,6 +88,23 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "devnotes.sidebar",
+        "contents": "Synced Notes\n[Add Account](command:devnotes.connectAccount)",
+        "when": "devnotes.emptyState && !devnotes.syncConnected"
+      },
+      {
+        "view": "devnotes.sidebar",
+        "contents": "Synced Notes\n[Add Synced Note](command:devnotes.createSyncedNote)",
+        "when": "devnotes.emptyState && devnotes.syncConnected"
+      },
+      {
+        "view": "devnotes.sidebar",
+        "contents": "Local Notes\n[Add Local Note](command:devnotes.createLocalNote)",
+        "when": "devnotes.emptyState"
+      }
+    ],
     "commands": [
       {
         "command": "devnotes.accountMenu",
@@ -113,20 +137,41 @@
       },
       {
         "command": "devnotes.createNote",
-        "title": "Quick Notes: Create Note"
+        "title": "Create Note"
       },
       {
         "command": "devnotes.createNoteQuick",
         "title": "Quick Notes: Create Note",
-        "icon": "$(add)"
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "devnotes.createFolderQuick",
+        "title": "Quick Notes: Create Folder",
+        "icon": "$(new-folder)"
       },
       {
         "command": "devnotes.createSyncedNote",
-        "title": "Quick Notes: Create Synced Note"
+        "title": "Quick Notes: Create Synced Note",
+        "icon": "$(new-file)"
       },
       {
         "command": "devnotes.createLocalNote",
-        "title": "Quick Notes: Create Local Note"
+        "title": "Quick Notes: Create Local Note",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "devnotes.createFolder",
+        "title": "Create Folder"
+      },
+      {
+        "command": "devnotes.createSyncedFolder",
+        "title": "Quick Notes: Create Synced Folder",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "devnotes.createLocalFolder",
+        "title": "Quick Notes: Create Local Folder",
+        "icon": "$(new-folder)"
       },
       {
         "command": "devnotes.openNote",
@@ -134,36 +179,51 @@
       },
       {
         "command": "devnotes.renameNote",
-        "title": "Quick Notes: Rename Note"
+        "title": "Rename Note"
+      },
+      {
+        "command": "devnotes.renameFolder",
+        "title": "Rename Folder"
       },
       {
         "command": "devnotes.duplicateNote",
-        "title": "Quick Notes: Duplicate Note"
-      },
-      {
-        "command": "devnotes.noteActions",
-        "title": "Quick Notes: Note Actions",
-        "icon": "$(ellipsis)"
+        "title": "Duplicate Note"
       },
       {
         "command": "devnotes.deleteNote",
-        "title": "Quick Notes: Delete Note"
+        "title": "Delete Note"
+      },
+      {
+        "command": "devnotes.deleteFolder",
+        "title": "Delete Folder"
       },
       {
         "command": "devnotes.revealNoteInFolder",
-        "title": "Quick Notes: Reveal Note In Folder"
+        "title": "Reveal Note In Folder"
       },
       {
         "command": "devnotes.copyNotePath",
         "title": "Quick Notes: Copy Note Path"
       },
       {
+        "command": "devnotes.insertImageIntoNote",
+        "title": "Insert Image Into Note"
+      },
+      {
         "command": "devnotes.moveNoteToSynced",
-        "title": "Quick Notes: Move Note To Synced"
+        "title": "Move Note To Synced"
       },
       {
         "command": "devnotes.moveNoteToLocal",
-        "title": "Quick Notes: Move Note To Local"
+        "title": "Move Note To Local"
+      },
+      {
+        "command": "devnotes.moveNoteToFolder",
+        "title": "Move Note To Folder"
+      },
+      {
+        "command": "devnotes.moveFolder",
+        "title": "Move Folder"
       },
       {
         "command": "devnotes.openNotesFolder",
@@ -199,14 +259,19 @@
           "group": "navigation@1"
         },
         {
-          "command": "devnotes.refreshNotes",
+          "command": "devnotes.createFolderQuick",
           "when": "view == devnotes.sidebar",
           "group": "navigation@2"
         },
         {
-          "command": "devnotes.accountMenu",
+          "command": "devnotes.refreshNotes",
           "when": "view == devnotes.sidebar",
           "group": "navigation@3"
+        },
+        {
+          "command": "devnotes.accountMenu",
+          "when": "view == devnotes.sidebar",
+          "group": "navigation@4"
         }
       ],
       "view/item/context": [
@@ -221,19 +286,89 @@
           "group": "navigation@2"
         },
         {
-          "command": "devnotes.noteActions",
+          "command": "devnotes.renameNote",
           "when": "view == devnotes.sidebar && (viewItem == noteItem.synced || viewItem == noteItem.local)",
+          "group": "navigation@1"
+        },
+        {
+          "command": "devnotes.deleteNote",
+          "when": "view == devnotes.sidebar && (viewItem == noteItem.synced || viewItem == noteItem.local)",
+          "group": "navigation@2"
+        },
+        {
+          "command": "devnotes.duplicateNote",
+          "when": "view == devnotes.sidebar && (viewItem == noteItem.synced || viewItem == noteItem.local)",
+          "group": "navigation@3"
+        },
+        {
+          "command": "devnotes.insertImageIntoNote",
+          "when": "view == devnotes.sidebar && (viewItem == noteItem.synced || viewItem == noteItem.local)",
+          "group": "navigation@4"
+        },
+        {
+          "command": "devnotes.revealNoteInFolder",
+          "when": "view == devnotes.sidebar && (viewItem == noteItem.synced || viewItem == noteItem.local)",
+          "group": "navigation@5"
+        },
+        {
+          "command": "devnotes.moveNoteToFolder",
+          "when": "view == devnotes.sidebar && (viewItem == noteItem.synced || viewItem == noteItem.local)",
+          "group": "navigation@6"
+        },
+        {
+          "command": "devnotes.moveNoteToLocal",
+          "when": "view == devnotes.sidebar && viewItem == noteItem.synced",
+          "group": "navigation@7"
+        },
+        {
+          "command": "devnotes.moveNoteToSynced",
+          "when": "view == devnotes.sidebar && viewItem == noteItem.local",
+          "group": "navigation@7"
+        },
+        {
+          "command": "devnotes.createSyncedNote",
+          "when": "view == devnotes.sidebar && viewItem == sectionItem.synced",
           "group": "inline@1"
         },
         {
-          "command": "devnotes.createNote",
+          "command": "devnotes.createSyncedFolder",
           "when": "view == devnotes.sidebar && viewItem == sectionItem.synced",
-          "group": "inline"
+          "group": "inline@2"
+        },
+        {
+          "command": "devnotes.createLocalNote",
+          "when": "view == devnotes.sidebar && viewItem == sectionItem.local",
+          "group": "inline@1"
+        },
+        {
+          "command": "devnotes.createLocalFolder",
+          "when": "view == devnotes.sidebar && viewItem == sectionItem.local",
+          "group": "inline@2"
         },
         {
           "command": "devnotes.createNote",
-          "when": "view == devnotes.sidebar && viewItem == sectionItem.local",
-          "group": "inline"
+          "when": "view == devnotes.sidebar && (viewItem == folderItem.synced || viewItem == folderItem.local)",
+          "group": "navigation@1"
+        },
+        {
+          "command": "devnotes.createFolder",
+          "when": "view == devnotes.sidebar && (viewItem == folderItem.synced || viewItem == folderItem.local)",
+          "group": "navigation@2"
+        },
+        {
+          "command": "devnotes.renameFolder",
+          "when": "view == devnotes.sidebar && (viewItem == folderItem.synced || viewItem == folderItem.local)",
+          "group": "navigation@3"
+        },
+        {
+          "command": "devnotes.moveFolder",
+          "when": "view == devnotes.sidebar && (viewItem == folderItem.synced || viewItem == folderItem.local)",
+          "group": "navigation@4"
+        },
+        {
+          "command": "devnotes.deleteFolder",
+          "when": "view == devnotes.sidebar && (viewItem == folderItem.synced || viewItem == folderItem.local)",
+          "group": "navigation@5"
         }
       ],
       "commandPalette": [
@@ -250,11 +385,31 @@
           "when": "false"
         },
         {
+          "command": "devnotes.deleteFolder",
+          "when": "false"
+        },
+        {
           "command": "devnotes.createSyncedNote",
           "when": "false"
         },
         {
           "command": "devnotes.createLocalNote",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.createFolderQuick",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.createFolder",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.createSyncedFolder",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.createLocalFolder",
           "when": "false"
         },
         {
@@ -274,10 +429,6 @@
           "when": "false"
         },
         {
-          "command": "devnotes.noteActions",
-          "when": "false"
-        },
-        {
           "command": "devnotes.resetSyncedWarning",
           "when": "false"
         },
@@ -288,6 +439,18 @@
         {
           "command": "devnotes.moveNoteToLocal",
           "when": "false"
+        },
+        {
+          "command": "devnotes.moveNoteToFolder",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.moveFolder",
+          "when": "false"
+        },
+        {
+          "command": "devnotes.insertImageIntoNote",
+          "when": "true"
         }
       ]
     },

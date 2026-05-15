@@ -7,7 +7,9 @@ type ActionKey =
   | 'rename'
   | 'delete'
   | 'duplicate'
+  | 'insertImage'
   | 'reveal'
+  | 'moveToFolder'
   | 'moveToSynced'
   | 'moveToLocal';
 
@@ -16,7 +18,9 @@ const ACTION_TO_COMMAND: Record<ActionKey, string> = {
   rename: 'devnotes.renameNote',
   delete: 'devnotes.deleteNote',
   duplicate: 'devnotes.duplicateNote',
+  insertImage: 'devnotes.insertImageIntoNote',
   reveal: 'devnotes.revealNoteInFolder',
+  moveToFolder: 'devnotes.moveNoteToFolder',
   moveToSynced: 'devnotes.moveNoteToSynced',
   moveToLocal: 'devnotes.moveNoteToLocal'
 };
@@ -34,7 +38,9 @@ export function registerNoteActionsCommand(context: vscode.ExtensionContext): vo
           { label: 'Rename', value: 'rename' },
           { label: 'Delete', value: 'delete' },
           { label: 'Duplicate', value: 'duplicate' },
-          { label: 'Reveal in Folder', value: 'reveal' }
+          { label: 'Insert Image', value: 'insertImage' },
+          { label: 'Reveal in Folder', value: 'reveal' },
+          { label: 'Move to Folder', value: 'moveToFolder' }
         ];
 
         if (item.space === 'local') {

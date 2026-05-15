@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
+import { NotesProvider } from '../tree/notesProvider';
 import { logError } from '../utils/logger';
 
-export function registerCreateNoteQuickCommand(context: vscode.ExtensionContext): void {
+export function registerCreateNoteQuickCommand(context: vscode.ExtensionContext, notesProvider: NotesProvider): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('devnotes.createNoteQuick', async () => {
       try {
@@ -17,7 +18,13 @@ export function registerCreateNoteQuickCommand(context: vscode.ExtensionContext)
           return;
         }
 
-        await vscode.commands.executeCommand('devnotes.createNote', selected.value);
+        const selectedFolder = notesProvider.getSelectedFolder();
+        const targetArg =
+          selectedFolder && selectedFolder.space === selected.value
+            ? { space: selected.value, fullPath: selectedFolder.fullPath }
+            : selected.value;
+
+        await vscode.commands.executeCommand('devnotes.createNote', targetArg);
       } catch (error) {
         logError('Failed to run quick create note', error);
         vscode.window.showErrorMessage('Unable to create note right now.');

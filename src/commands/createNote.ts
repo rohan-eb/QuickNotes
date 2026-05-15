@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { createNoteFileInDirectory } from '../storage/localStorage';
 import { NoteSpace } from '../tree/noteItem';
 import { NotesProvider } from '../tree/notesProvider';
+import { ensureConnectedSessionForSyncedAction } from './connectAccount';
 import { logError } from '../utils/logger';
 import { resolveLocalNotesPath, resolveSyncedNotesPath } from '../utils/paths';
 import { maybeAutoSyncForPath } from '../utils/syncTrigger';
@@ -30,9 +31,23 @@ export function registerCreateNoteCommand(context: vscode.ExtensionContext, note
             : arg && typeof arg === 'object' && 'space' in arg
               ? String((arg as { space?: unknown }).space)
               : undefined;
+        const targetDirFromArg =
+          arg && typeof arg === 'object' && 'fullPath' in arg ? String((arg as { fullPath?: unknown }).fullPath) : undefined;
 
         const space = spaceFromArg === 'synced' || spaceFromArg === 'local' ? spaceFromArg : getDefaultSpace();
-        const targetDir = space === 'synced' ? resolveSyncedNotesPath() : resolveLocalNotesPath();
+
+        if (space === 'synced') {
+          const connectedSession = await ensureConnectedSessionForSyncedAction(notesProvider, {
+            cancelMessage: 'Account connection was canceled. Synced note was not created.'
+          });
+
+          if (!connectedSession) {
+            return;
+          }
+        }
+
+        const defaultDir = space === 'synced' ? resolveSyncedNotesPath() : resolveLocalNotesPath();
+        const targetDir = targetDirFromArg && targetDirFromArg.length > 0 ? targetDirFromArg : defaultDir;
 
         const fullPath = await createNoteFileInDirectory(targetDir, input);
         await maybeAutoSyncForPath(fullPath);

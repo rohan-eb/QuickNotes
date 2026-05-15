@@ -7,6 +7,8 @@ export function registerContinueLocalOnlyCommand(context: vscode.ExtensionContex
     vscode.commands.registerCommand('devnotes.continueLocalOnly', async () => {
       try {
         const config = vscode.workspace.getConfiguration();
+        await config.update('devnotes.activeAccountKey', '', vscode.ConfigurationTarget.Global);
+        await config.update('devnotes.activeAccountLabel', '', vscode.ConfigurationTarget.Global);
         await config.update('devnotes.localOnlyMode', true, vscode.ConfigurationTarget.Global);
         await config.update('devnotes.autoSync', false, vscode.ConfigurationTarget.Global);
         vscode.window.showInformationMessage('QuickNotes is set to local-only mode.');

@@ -1,7 +1,9 @@
 import * as vscode from 'vscode';
+import { getGitHubSession } from '../github/auth';
 import { moveNoteToDirectory } from '../storage/localStorage';
 import { NoteItem } from '../tree/noteItem';
 import { NotesProvider } from '../tree/notesProvider';
+import { ensureConnectedSessionForSyncedAction } from './connectAccount';
 import { logError } from '../utils/logger';
 import { resolveLocalNotesPath, resolveSyncedNotesPath } from '../utils/paths';
 import { maybeAutoSyncForPath } from '../utils/syncTrigger';
@@ -47,6 +49,25 @@ export function registerMoveNoteSpaceCommands(context: vscode.ExtensionContext, 
 
         const accepted = await ensureSyncedVisibilityWarningAccepted(context);
         if (!accepted) {
+          return;
+        }
+
+        const connectedSession = await ensureConnectedSessionForSyncedAction(notesProvider, {
+          currentSession: await getGitHubSession(false),
+          cancelMessage: 'Account connection was canceled. The note stayed in Local Notes.'
+        });
+
+        if (!connectedSession) {
+          return;
+        }
+
+        const config = vscode.workspace.getConfiguration();
+        const localOnlyMode = config.get<boolean>('devnotes.localOnlyMode', false);
+        const activeAccountKey = config.get<string>('devnotes.activeAccountKey', '').trim();
+        const syncConnected = !localOnlyMode && activeAccountKey.length > 0;
+
+        if (!syncConnected) {
+          vscode.window.showWarningMessage('Connect a GitHub account before moving notes to Synced Notes.');
           return;
         }
 

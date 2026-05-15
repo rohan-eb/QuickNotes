@@ -79,21 +79,59 @@ async function pickGitHubSession(
   });
 }
 
+export async function connectAccountInteractive(
+  notesProvider: NotesProvider,
+  options?: { currentSession?: vscode.AuthenticationSession; successMessage?: string; cancelMessage?: string }
+): Promise<vscode.AuthenticationSession | undefined> {
+  const session = await pickGitHubSession(options?.currentSession);
+
+  if (!session) {
+    if (options?.cancelMessage) {
+      vscode.window.showWarningMessage(options.cancelMessage);
+    }
+    return undefined;
+  }
+
+  await activateConnectedSession(session);
+
+  if (options?.successMessage) {
+    vscode.window.showInformationMessage(options.successMessage.replace('{account}', session.account.label));
+  }
+
+  notesProvider.refresh();
+  return session;
+}
+
+export async function ensureConnectedSessionForSyncedAction(
+  notesProvider: NotesProvider,
+  options?: { currentSession?: vscode.AuthenticationSession; cancelMessage?: string }
+): Promise<vscode.AuthenticationSession | undefined> {
+  const config = vscode.workspace.getConfiguration();
+  const localOnlyMode = config.get<boolean>('devnotes.localOnlyMode', false);
+  const activeAccountKey = config.get<string>('devnotes.activeAccountKey', '').trim();
+  const currentSession = options?.currentSession ?? await getGitHubSession(false);
+  const syncConnected = Boolean(currentSession) && !localOnlyMode && activeAccountKey.length > 0;
+
+  if (syncConnected) {
+    return currentSession;
+  }
+
+  return connectAccountInteractive(notesProvider, {
+    currentSession,
+    cancelMessage: options?.cancelMessage ?? 'Account connection was canceled.'
+  });
+}
+
 export function registerConnectAccountCommand(context: vscode.ExtensionContext, notesProvider: NotesProvider): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('devnotes.connectAccount', async () => {
       try {
         const currentSession = await getGitHubSession(false);
-        const session = await pickGitHubSession(currentSession);
-
-        if (!session) {
-          vscode.window.showWarningMessage('GitHub authentication was not completed.');
-          return;
-        }
-
-        await activateConnectedSession(session);
-        vscode.window.showInformationMessage(`GitHub connected: ${session.account.label}`);
-        notesProvider.refresh();
+        await connectAccountInteractive(notesProvider, {
+          currentSession,
+          successMessage: 'GitHub connected: {account}',
+          cancelMessage: 'GitHub authentication was not completed.'
+        });
       } catch (error) {
         logError('Failed to connect account', error);
         vscode.window.showErrorMessage('Unable to connect account right now.');
@@ -107,17 +145,17 @@ export function registerSwitchAccountCommand(context: vscode.ExtensionContext, n
     vscode.commands.registerCommand('devnotes.switchAccount', async () => {
       try {
         const currentSession = await getGitHubSession(false);
-        const session = await pickGitHubSession(currentSession);
+        const session = await connectAccountInteractive(notesProvider, {
+          currentSession,
+          successMessage: 'GitHub active account: {account}',
+          cancelMessage: 'GitHub account switch was not completed.'
+        });
 
         if (!session) {
-          vscode.window.showWarningMessage('GitHub account switch was not completed.');
           return;
         }
 
-        await activateConnectedSession(session);
         await vscode.commands.executeCommand('devnotes.syncNotes', { silent: true });
-        vscode.window.showInformationMessage(`GitHub active account: ${session.account.label}`);
-        notesProvider.refresh();
       } catch (error) {
         logError('Failed to switch account', error);
         const reason = error instanceof Error ? error.message : 'Unknown error';
@@ -141,6 +179,7 @@ export function registerDisconnectAccountCommand(context: vscode.ExtensionContex
         }
 
         const config = vscode.workspace.getConfiguration();
+        await config.update('devnotes.activeAccountKey', '', vscode.ConfigurationTarget.Global);
         await config.update('devnotes.activeAccountLabel', '', vscode.ConfigurationTarget.Global);
         await config.update('devnotes.localOnlyMode', true, vscode.ConfigurationTarget.Global);
         await config.update('devnotes.autoSync', false, vscode.ConfigurationTarget.Global);

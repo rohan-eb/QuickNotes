@@ -52,6 +52,7 @@ export async function restoreNotesFromGitHub(session: AuthenticationSession): Pr
     return { restored: true };
   }
 
-  await runGitWithGitHubAuth(repoPath, ['pull', '--rebase', 'origin', config.branch], session.accessToken);
+  await runGitWithGitHubAuth(repoPath, ['fetch', 'origin', config.branch], session.accessToken);
+  await runGit(repoPath, ['rebase', `origin/${config.branch}`]);
   return { restored: true };
 }
