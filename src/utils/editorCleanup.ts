@@ -29,3 +29,19 @@ export async function closeOpenTabsUnderDirectory(rootDir: string): Promise<numb
   await vscode.window.tabGroups.close(tabsToClose);
   return tabsToClose.length;
 }
+
+export async function closeOpenTabForFile(filePath: string): Promise<boolean> {
+  const resolvedTarget = path.resolve(filePath);
+
+  for (const group of vscode.window.tabGroups.all) {
+    for (const tab of group.tabs) {
+      const input = tab.input;
+      if (input instanceof vscode.TabInputText && path.resolve(input.uri.fsPath) === resolvedTarget) {
+        await vscode.window.tabGroups.close(tab);
+        return true;
+      }
+    }
+  }
+
+  return false;
+}

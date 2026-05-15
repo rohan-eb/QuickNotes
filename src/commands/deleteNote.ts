@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { deleteNoteByPath } from '../storage/localStorage';
 import { NoteItem } from '../tree/noteItem';
 import { NotesProvider } from '../tree/notesProvider';
+import { closeOpenTabForFile } from '../utils/editorCleanup';
 import { logError } from '../utils/logger';
 import { maybeAutoSyncForPath } from '../utils/syncTrigger';
 
@@ -19,6 +20,7 @@ export function registerDeleteNoteCommand(context: vscode.ExtensionContext, note
           return;
         }
 
+        await closeOpenTabForFile(item.fullPath);
         await deleteNoteByPath(item.fullPath);
         await maybeAutoSyncForPath(item.fullPath);
         notesProvider.refresh();

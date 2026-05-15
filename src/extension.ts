@@ -10,14 +10,20 @@ import { registerConnectGitHubCommand } from './commands/connectGitHub';
 import { registerContinueLocalOnlyCommand } from './commands/continueLocalOnly';
 import { registerCopyNotePathCommand } from './commands/copyNotePath';
 import { registerCreateNoteCommand } from './commands/createNote';
+import { registerCreateFolderCommand } from './commands/createFolder';
+import { registerCreateFolderQuickCommand } from './commands/createFolderQuick';
 import { registerCreateNoteQuickCommand } from './commands/createNoteQuick';
 import { registerDeleteNoteCommand } from './commands/deleteNote';
+import { registerDeleteFolderCommand } from './commands/deleteFolder';
 import { registerDuplicateNoteCommand } from './commands/duplicateNote';
 import { registerMoveNoteSpaceCommands } from './commands/moveNoteSpace';
-import { registerNoteActionsCommand } from './commands/noteActions';
+import { registerMoveNoteToFolderCommand } from './commands/moveNoteToFolder';
+import { registerMoveFolderCommand } from './commands/moveFolder';
 import { registerOpenNoteCommand } from './commands/openNote';
 import { registerOpenNotesFolderCommand } from './commands/openNotesFolder';
+import { registerInsertImageIntoNoteCommand } from './commands/insertImageIntoNote';
 import { registerRenameNoteCommand } from './commands/renameNote';
+import { registerRenameFolderCommand } from './commands/renameFolder';
 import { registerRevealNoteInFolderCommand } from './commands/revealNoteInFolder';
 import { registerRestoreNotesCommand } from './commands/restoreNotes';
 import { registerResetSyncedWarningCommand } from './commands/resetSyncedWarning';
@@ -38,18 +44,56 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await Promise.all([ensureDirectory(resolveSyncedNotesPath()), ensureDirectory(resolveLocalNotesPath())]);
 
     const notesProvider = new NotesProvider();
-    vscode.window.registerTreeDataProvider('devnotes.sidebar', notesProvider);
+    const notesTreeView = vscode.window.createTreeView('devnotes.sidebar', { treeDataProvider: notesProvider });
+    context.subscriptions.push(notesTreeView);
+    context.subscriptions.push(
+      notesTreeView.onDidChangeSelection((event) => {
+        notesProvider.setSelectedItem(event.selection[0]);
+      })
+    );
 
     registerCreateNoteCommand(context, notesProvider);
-    registerCreateNoteQuickCommand(context);
+    registerCreateFolderCommand(context, notesProvider);
+    registerCreateNoteQuickCommand(context, notesProvider);
+    registerCreateFolderQuickCommand(context, notesProvider);
     context.subscriptions.push(
       vscode.commands.registerCommand('devnotes.createSyncedNote', async () => {
-        await vscode.commands.executeCommand('devnotes.createNote', 'synced');
+        const selectedFolder = notesProvider.getSelectedFolder();
+        const targetArg =
+          selectedFolder && selectedFolder.space === 'synced'
+            ? { space: 'synced', fullPath: selectedFolder.fullPath }
+            : 'synced';
+        await vscode.commands.executeCommand('devnotes.createNote', targetArg);
       })
     );
     context.subscriptions.push(
       vscode.commands.registerCommand('devnotes.createLocalNote', async () => {
-        await vscode.commands.executeCommand('devnotes.createNote', 'local');
+        const selectedFolder = notesProvider.getSelectedFolder();
+        const targetArg =
+          selectedFolder && selectedFolder.space === 'local'
+            ? { space: 'local', fullPath: selectedFolder.fullPath }
+            : 'local';
+        await vscode.commands.executeCommand('devnotes.createNote', targetArg);
+      })
+    );
+    context.subscriptions.push(
+      vscode.commands.registerCommand('devnotes.createSyncedFolder', async () => {
+        const selectedFolder = notesProvider.getSelectedFolder();
+        const targetArg =
+          selectedFolder && selectedFolder.space === 'synced'
+            ? { space: 'synced', fullPath: selectedFolder.fullPath }
+            : 'synced';
+        await vscode.commands.executeCommand('devnotes.createFolder', targetArg);
+      })
+    );
+    context.subscriptions.push(
+      vscode.commands.registerCommand('devnotes.createLocalFolder', async () => {
+        const selectedFolder = notesProvider.getSelectedFolder();
+        const targetArg =
+          selectedFolder && selectedFolder.space === 'local'
+            ? { space: 'local', fullPath: selectedFolder.fullPath }
+            : 'local';
+        await vscode.commands.executeCommand('devnotes.createFolder', targetArg);
       })
     );
     registerConnectGitHubCommand(context);
@@ -62,12 +106,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     registerOpenNoteCommand(context);
     registerRenameNoteCommand(context, notesProvider);
     registerDeleteNoteCommand(context, notesProvider);
+    registerDeleteFolderCommand(context, notesProvider);
     registerDuplicateNoteCommand(context, notesProvider);
-    registerNoteActionsCommand(context);
     registerMoveNoteSpaceCommands(context, notesProvider);
+    registerMoveNoteToFolderCommand(context, notesProvider);
+    registerMoveFolderCommand(context, notesProvider);
+    registerRenameFolderCommand(context, notesProvider);
     registerRevealNoteInFolderCommand(context);
     registerCopyNotePathCommand(context);
     registerOpenNotesFolderCommand(context);
+    registerInsertImageIntoNoteCommand(context);
     registerSyncNotesCommand(context);
     registerSyncStatusCommand(context);
     registerRestoreNotesCommand(context);

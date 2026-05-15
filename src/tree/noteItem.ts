@@ -22,17 +22,36 @@ export class NoteItem extends vscode.TreeItem {
   }
 }
 
+export class FolderItem extends vscode.TreeItem {
+  constructor(
+    public readonly label: string,
+    public readonly fullPath: string,
+    public readonly space: NoteSpace
+  ) {
+    super(label, vscode.TreeItemCollapsibleState.Collapsed);
+    this.contextValue = `folderItem.${space}`;
+    this.resourceUri = vscode.Uri.file(path.resolve(fullPath));
+    this.iconPath = new vscode.ThemeIcon('folder');
+  }
+}
+
 export class ActionItem extends vscode.TreeItem {
-  constructor(label: string, command: string, description?: string) {
+  constructor(
+    label: string,
+    command: string,
+    description?: string,
+    iconId: string = 'arrow-right'
+  ) {
     super(label, vscode.TreeItemCollapsibleState.None);
     this.contextValue = 'actionItem';
     this.description = description;
     this.command = { command, title: label };
+    this.iconPath = new vscode.ThemeIcon(iconId);
   }
 }
 
 export class AccountItem extends vscode.TreeItem {
-  constructor(label: string, description: string) {
+  constructor(label: string, description?: string) {
     super(label, vscode.TreeItemCollapsibleState.None);
     this.contextValue = 'accountItem';
     this.description = description;
@@ -53,4 +72,11 @@ export class SectionItem extends vscode.TreeItem {
   }
 }
 
-export type SidebarItem = NoteItem | ActionItem | AccountItem | SectionItem;
+export class SpacerItem extends vscode.TreeItem {
+  constructor() {
+    super(' ', vscode.TreeItemCollapsibleState.None);
+    this.contextValue = 'spacerItem';
+  }
+}
+
+export type SidebarItem = NoteItem | FolderItem | ActionItem | AccountItem | SectionItem | SpacerItem;
