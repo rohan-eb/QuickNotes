@@ -4,7 +4,10 @@ import { moveNoteToDirectory } from '../storage/localStorage';
 import { NoteItem } from '../tree/noteItem';
 import { NotesProvider } from '../tree/notesProvider';
 import { ensureConnectedSessionForSyncedAction } from './connectAccount';
+import { closeOpenTabForFile } from '../utils/editorCleanup';
 import { logError } from '../utils/logger';
+import { relocateLinkedImagesForMovedNote } from '../utils/markdownImages';
+import { ensureSyncedNoteMetadata } from '../utils/noteMetadata';
 import { resolveLocalNotesPath, resolveSyncedNotesPath } from '../utils/paths';
 import { maybeAutoSyncForPath } from '../utils/syncTrigger';
 
@@ -12,7 +15,16 @@ const SYNCED_VISIBILITY_WARNING_KEY = 'devnotes.syncedVisibilityWarningAccepted'
 
 async function moveNote(item: NoteItem, target: 'synced' | 'local', notesProvider: NotesProvider): Promise<void> {
   const targetDir = target === 'synced' ? resolveSyncedNotesPath() : resolveLocalNotesPath();
+  const originalPath = item.fullPath;
+  await closeOpenTabForFile(originalPath);
   const movedPath = await moveNoteToDirectory(item.fullPath, targetDir);
+  await relocateLinkedImagesForMovedNote(originalPath, movedPath);
+  if (target === 'synced') {
+    await ensureSyncedNoteMetadata(movedPath, {
+      source: item.space === 'local' ? 'vscode' : undefined,
+      forceUpdatedAt: item.space === 'local'
+    });
+  }
   await maybeAutoSyncForPath(item.fullPath);
   await maybeAutoSyncForPath(movedPath);
   notesProvider.refresh();

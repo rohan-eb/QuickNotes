@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-05-19
+
+### Improved
+
+- Much more reliable GitHub sync for synced notes, especially around save-time rebase flow and repeated auto-sync triggers.
+- Better recovery from note conflicts, including safer handling of remote-deleted notes and internal conflict backup files.
+- Moving notes between Local and Synced spaces now preserves linked images more safely.
+- Renaming, moving, and deleting notes or folders now closes stale editors first to avoid confusing deleted-file tabs.
+- Synced note titles are now read correctly from Markdown headings in the sidebar, even when metadata comment blocks are present.
+- Internal sync marker handling is less noisy, reducing false dirty-repo states during normal sync.
+
 ## [0.0.4] - 2026-05-15
 
 ### Added

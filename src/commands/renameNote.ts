@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { renameNoteByPath } from '../storage/localStorage';
 import { NoteItem } from '../tree/noteItem';
 import { NotesProvider } from '../tree/notesProvider';
+import { closeOpenTabForFile } from '../utils/editorCleanup';
 import { logError } from '../utils/logger';
 import { maybeAutoSyncForPath } from '../utils/syncTrigger';
 
@@ -18,6 +19,7 @@ export function registerRenameNoteCommand(context: vscode.ExtensionContext, note
           return;
         }
 
+        await closeOpenTabForFile(item.fullPath);
         const newPath = await renameNoteByPath(item.fullPath, newName);
         await maybeAutoSyncForPath(newPath);
         notesProvider.refresh();

@@ -4,7 +4,10 @@ import * as vscode from 'vscode';
 import { NoteItem, NoteSpace } from '../tree/noteItem';
 import { NotesProvider } from '../tree/notesProvider';
 import { ensureConnectedSessionForSyncedAction } from './connectAccount';
+import { closeOpenTabForFile } from '../utils/editorCleanup';
 import { logError } from '../utils/logger';
+import { relocateLinkedImagesForMovedNote } from '../utils/markdownImages';
+import { ensureSyncedNoteMetadata } from '../utils/noteMetadata';
 import { resolveLocalNotesPath, resolveSyncedNotesPath } from '../utils/paths';
 import { maybeAutoSyncForPath } from '../utils/syncTrigger';
 
@@ -95,7 +98,16 @@ export function registerMoveNoteToFolderCommand(context: vscode.ExtensionContext
         }
 
         const destinationPath = path.join(selected.folderPath, path.basename(item.fullPath));
+        const originalPath = item.fullPath;
+        await closeOpenTabForFile(originalPath);
         await fs.rename(item.fullPath, destinationPath);
+        await relocateLinkedImagesForMovedNote(originalPath, destinationPath);
+        if (selected.space === 'synced') {
+          await ensureSyncedNoteMetadata(destinationPath, {
+            source: item.space === 'local' ? 'vscode' : undefined,
+            forceUpdatedAt: item.space === 'local'
+          });
+        }
         await maybeAutoSyncForPath(item.fullPath);
         await maybeAutoSyncForPath(destinationPath);
         notesProvider.refresh();

@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { FolderItem } from '../tree/noteItem';
 import { NotesProvider } from '../tree/notesProvider';
+import { closeOpenTabsUnderDirectory } from '../utils/editorCleanup';
 import { logError } from '../utils/logger';
 import { maybeAutoSyncForPath } from '../utils/syncTrigger';
 
@@ -30,6 +31,7 @@ export function registerRenameFolderCommand(context: vscode.ExtensionContext, no
         }
 
         const nextPath = path.join(parentDir, trimmed);
+        await closeOpenTabsUnderDirectory(item.fullPath);
         await fs.rename(item.fullPath, nextPath);
         await maybeAutoSyncForPath(item.fullPath);
         await maybeAutoSyncForPath(nextPath);

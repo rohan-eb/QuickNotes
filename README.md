@@ -4,7 +4,7 @@
 
 QuickNotes is a Markdown note-taking extension built for developers who want a distraction-free, local-first workspace. Write notes in VS Code, keep them private on-device, or back them up silently to a private GitHub repository. No separate app. No context switching.
 
-[![Version](https://img.shields.io/badge/version-0.0.4-blue)](https://github.com/rohan-eb/QuickNotes)
+[![Version](https://img.shields.io/badge/version-0.0.5-blue)](https://github.com/rohan-eb/QuickNotes)
 [![VS Code](https://img.shields.io/badge/VS%20Code-1.90%2B-007acc)](https://code.visualstudio.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Sync](https://img.shields.io/badge/sync-GitHub-black)](https://github.com/rohan-eb/QuickNotes)
@@ -157,6 +157,13 @@ Not directly via import yet, but the notes directories (`~/.devnotes` and `~/.de
 ---
 
 ## Changelog
+
+### 0.0.5 — 2026-05-19
+- Stronger GitHub sync stability around save/rebase timing
+- Better conflict recovery and cleanup for synced notes
+- Safer image handling when moving notes between spaces
+- Stale editors now close automatically after note/folder move, rename, or delete
+- Synced note titles now render correctly from Markdown headings in the sidebar
 
 ### 0.0.4 — 2026-05-15
 - Nested folder support for both note spaces

@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { FolderItem, NoteSpace } from '../tree/noteItem';
 import { NotesProvider } from '../tree/notesProvider';
 import { ensureConnectedSessionForSyncedAction } from './connectAccount';
+import { closeOpenTabsUnderDirectory } from '../utils/editorCleanup';
 import { logError } from '../utils/logger';
 import { resolveLocalNotesPath, resolveSyncedNotesPath } from '../utils/paths';
 import { maybeAutoSyncForPath } from '../utils/syncTrigger';
@@ -108,6 +109,7 @@ export function registerMoveFolderCommand(context: vscode.ExtensionContext, note
         }
 
         const destinationPath = path.join(selected.folderPath, path.basename(item.fullPath));
+        await closeOpenTabsUnderDirectory(item.fullPath);
         await fs.rename(item.fullPath, destinationPath);
         await maybeAutoSyncForPath(item.fullPath);
         await maybeAutoSyncForPath(destinationPath);

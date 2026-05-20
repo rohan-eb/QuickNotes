@@ -5,13 +5,15 @@ export type NoteSpace = 'synced' | 'local';
 
 export class NoteItem extends vscode.TreeItem {
   constructor(
+    public readonly label: string,
     public readonly fileName: string,
     public readonly fullPath: string,
     public readonly space: NoteSpace
   ) {
-    super(fileName, vscode.TreeItemCollapsibleState.None);
+    super(label, vscode.TreeItemCollapsibleState.None);
 
     this.contextValue = `noteItem.${space}`;
+    this.description = label === fileName ? undefined : fileName;
     this.command = {
       command: 'devnotes.openNote',
       title: 'Open Note',
