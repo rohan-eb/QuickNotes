@@ -3,6 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as vscode from 'vscode';
 import { getGitHubSession } from '../github/auth';
 import { ensureDirectory } from '../storage/localStorage';
+import { isConflictBackupNoteName } from '../utils/conflictBackups';
 import { resolveLocalNotesPath, resolveSyncedNotesPath } from '../utils/paths';
 import { AccountItem, FolderItem, NoteItem, NoteSpace, SectionItem, SidebarItem, SpacerItem } from './noteItem';
 
@@ -90,26 +91,103 @@ export class NotesProvider implements vscode.TreeDataProvider<SidebarItem> {
     return this.getItemsForDirectory(space, notesPath);
   }
 
+  private async directoryHasVisibleItems(dirPath: string): Promise<boolean> {
+    const entries = await fs.readdir(dirPath, { withFileTypes: true }).catch(() => []);
+
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name);
+
+      if (entry.isDirectory()) {
+        if (entry.name === '.git' || entry.name === 'assets' || entry.name === 'accounts') {
+          continue;
+        }
+
+        if (await this.directoryHasVisibleItems(fullPath)) {
+          return true;
+        }
+        continue;
+      }
+
+      if (entry.isFile() && entry.name.endsWith('.md') && !isConflictBackupNoteName(entry.name)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   private async getItemsForDirectory(space: NoteSpace, dirPath: string): Promise<SidebarItem[]> {
     await ensureDirectory(dirPath);
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
 
-    const folders = entries
-      .filter(
-        (entry) =>
-          entry.isDirectory() &&
-          entry.name !== '.git' &&
-          entry.name !== 'assets' &&
-          entry.name !== 'accounts'
-      )
-      .map((entry) => new FolderItem(entry.name, path.join(dirPath, entry.name), space))
-      .sort((a, b) => a.label.localeCompare(b.label));
+    const folders: FolderItem[] = [];
+    for (const entry of entries) {
+      if (
+        !entry.isDirectory() ||
+        entry.name === '.git' ||
+        entry.name === 'assets' ||
+        entry.name === 'accounts'
+      ) {
+        continue;
+      }
+
+      const fullPath = path.join(dirPath, entry.name);
+      if (await this.directoryHasVisibleItems(fullPath)) {
+        folders.push(new FolderItem(entry.name, fullPath, space));
+      }
+    }
+    folders.sort((a, b) => a.label.localeCompare(b.label));
 
     const notes = entries
-      .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
-      .map((entry) => new NoteItem(entry.name, path.join(dirPath, entry.name), space))
-      .sort((a, b) => a.fileName.localeCompare(b.fileName));
+      .filter(
+        (entry) => entry.isFile() && entry.name.endsWith('.md') && !isConflictBackupNoteName(entry.name)
+      )
+      .map(async (entry) => {
+        const fullPath = path.join(dirPath, entry.name);
+        const label = await this.readNoteLabel(fullPath, entry.name);
+        return new NoteItem(label, entry.name, fullPath, space);
+      });
 
-    return [...folders, ...notes];
+    const resolvedNotes = await Promise.all(notes);
+    resolvedNotes.sort((a, b) => a.label.toString().localeCompare(b.label.toString()));
+
+    return [...folders, ...resolvedNotes];
+  }
+
+  private async readNoteLabel(fullPath: string, fileName: string): Promise<string> {
+    try {
+      const content = await fs.readFile(fullPath, 'utf8');
+      const lines = content.split(/\r?\n/);
+      let insideFrontmatter = false;
+      let insideSyncedComment = false;
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (line.startsWith('<!-- quicknotes-sync')) {
+          insideSyncedComment = true;
+          continue;
+        }
+        if (insideSyncedComment) {
+          if (line === '-->') {
+            insideSyncedComment = false;
+          }
+          continue;
+        }
+        if (line === '---') {
+          insideFrontmatter = !insideFrontmatter;
+          continue;
+        }
+        if (!line || insideFrontmatter) {
+          continue;
+        }
+        if (line.startsWith('# ')) {
+          return line.replace(/^#\s+/, '').trim() || fileName;
+        }
+        break;
+      }
+    } catch {
+      // Fall back to the file name when the file cannot be read.
+    }
+
+    return fileName;
   }
 }

@@ -35,7 +35,8 @@ import { NotesProvider } from './tree/notesProvider';
 import { getGitHubSession } from './github/auth';
 import { closeOpenTabsUnderDirectory } from './utils/editorCleanup';
 import { initializeLogger, logError, logInfo } from './utils/logger';
-import { resolveLocalNotesPath, resolveSyncedNotesPath } from './utils/paths';
+import { ensureSyncedNoteMetadata } from './utils/noteMetadata';
+import { resolveLocalNotesPath, resolveSyncedNotesBasePath, resolveSyncedNotesPath } from './utils/paths';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   initializeLogger();
@@ -49,6 +50,34 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(
       notesTreeView.onDidChangeSelection((event) => {
         notesProvider.setSelectedItem(event.selection[0]);
+      })
+    );
+
+    const syncedWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(resolveSyncedNotesBasePath(), '**/*')
+    );
+    const localWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(resolveLocalNotesPath(), '**/*')
+    );
+
+    const refreshNotesTree = (): void => {
+      notesProvider.refresh();
+    };
+
+    for (const watcher of [syncedWatcher, localWatcher]) {
+      context.subscriptions.push(watcher);
+      context.subscriptions.push(watcher.onDidCreate(refreshNotesTree));
+      context.subscriptions.push(watcher.onDidChange(refreshNotesTree));
+      context.subscriptions.push(watcher.onDidDelete(refreshNotesTree));
+    }
+
+    const treeRefreshIntervalMs = 5_000;
+    const refreshTimer = setInterval(() => {
+      notesProvider.refresh();
+    }, treeRefreshIntervalMs);
+    context.subscriptions.push(
+      new vscode.Disposable(() => {
+        clearInterval(refreshTimer);
       })
     );
 
@@ -150,6 +179,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           return;
         }
 
+        await ensureSyncedNoteMetadata(doc.fileName, {
+          source: 'vscode',
+          forceUpdatedAt: true
+        });
         await vscode.commands.executeCommand('devnotes.syncNotes');
       })
     );

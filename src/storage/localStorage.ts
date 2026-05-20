@@ -1,6 +1,8 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { resolveSyncedNotesPath } from '../utils/paths';
+import { isConflictBackupNoteName } from '../utils/conflictBackups';
+import { buildInitialNoteDocument } from '../utils/noteMetadata';
 
 export async function ensureDirectory(dirPath: string): Promise<string> {
   await fs.mkdir(dirPath, { recursive: true });
@@ -15,7 +17,7 @@ export async function listNoteFilesInDirectory(dirPath: string): Promise<string[
   await ensureDirectory(dirPath);
   const entries = await fs.readdir(dirPath, { withFileTypes: true });
   return entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.md') && !isConflictBackupNoteName(entry.name))
     .map((entry) => entry.name)
     .sort((a, b) => a.localeCompare(b));
 }
@@ -25,13 +27,17 @@ export async function listNoteFiles(): Promise<string[]> {
   return listNoteFilesInDirectory(notesPath);
 }
 
-export async function createNoteFileInDirectory(dirPath: string, fileName: string): Promise<string> {
+export async function createNoteFileInDirectory(
+  dirPath: string,
+  fileName: string,
+  options?: { includeMetadata?: boolean; source?: string }
+): Promise<string> {
   await ensureDirectory(dirPath);
   const sanitizedName = fileName.trim().replace(/\s+/g, '-');
   const finalName = sanitizedName.endsWith('.md') ? sanitizedName : `${sanitizedName}.md`;
   const fullPath = path.join(dirPath, finalName);
 
-  await fs.writeFile(fullPath, `# ${finalName.replace(/\.md$/, '')}\n\n`, { flag: 'wx' });
+  await fs.writeFile(fullPath, buildInitialNoteDocument(finalName, options), { flag: 'wx' });
   return fullPath;
 }
 

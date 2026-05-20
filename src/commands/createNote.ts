@@ -49,7 +49,10 @@ export function registerCreateNoteCommand(context: vscode.ExtensionContext, note
         const defaultDir = space === 'synced' ? resolveSyncedNotesPath() : resolveLocalNotesPath();
         const targetDir = targetDirFromArg && targetDirFromArg.length > 0 ? targetDirFromArg : defaultDir;
 
-        const fullPath = await createNoteFileInDirectory(targetDir, input);
+        const fullPath = await createNoteFileInDirectory(targetDir, input, {
+          includeMetadata: space === 'synced',
+          source: 'vscode'
+        });
         await maybeAutoSyncForPath(fullPath);
 
         const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(fullPath));

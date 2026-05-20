@@ -4,6 +4,7 @@ import { copyNoteByPath } from '../storage/localStorage';
 import { NoteItem } from '../tree/noteItem';
 import { NotesProvider } from '../tree/notesProvider';
 import { logError } from '../utils/logger';
+import { ensureSyncedNoteMetadata, isSyncedMarkdownNote } from '../utils/noteMetadata';
 import { maybeAutoSyncForPath } from '../utils/syncTrigger';
 
 function suggestDuplicateName(fileName: string): string {
@@ -26,6 +27,13 @@ export function registerDuplicateNoteCommand(context: vscode.ExtensionContext, n
         }
 
         const fullPath = await copyNoteByPath(item.fullPath, newName);
+        if (isSyncedMarkdownNote(fullPath)) {
+          await ensureSyncedNoteMetadata(fullPath, {
+            regenerateIdentity: true,
+            source: 'vscode',
+            forceUpdatedAt: true
+          });
+        }
         await maybeAutoSyncForPath(fullPath);
         notesProvider.refresh();
 

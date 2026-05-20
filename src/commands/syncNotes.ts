@@ -3,8 +3,10 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { getGitHubSession } from '../github/auth';
 import { syncNotesWithGitHub } from '../github/gitSync';
+import { isConflictBackupNotePath } from '../utils/conflictBackups';
 import { logError } from '../utils/logger';
-import { findBrokenImageLinks } from '../utils/markdownImages';
+import { findBrokenImageLinks, repairBrokenLocalImageLinks } from '../utils/markdownImages';
+import { ensureSyncedNotesMetadataRecursively } from '../utils/noteMetadata';
 import { resolveSyncedNotesPath } from '../utils/paths';
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp']);
@@ -144,7 +146,9 @@ async function listMarkdownFilesRecursively(rootDir: string): Promise<string[]> 
       continue;
     }
     if (entry.isFile() && path.extname(entry.name).toLowerCase() === '.md') {
-      files.push(fullPath);
+      if (!isConflictBackupNotePath(fullPath)) {
+        files.push(fullPath);
+      }
     }
   }
 
@@ -166,6 +170,15 @@ async function validateSyncedImageLinks(): Promise<{ noteFile: string; links: st
   return broken;
 }
 
+async function repairSyncedImageLinks(): Promise<void> {
+  const syncedRoot = resolveSyncedNotesPath();
+  const markdownFiles = await listMarkdownFilesRecursively(syncedRoot);
+
+  for (const noteFile of markdownFiles) {
+    await repairBrokenLocalImageLinks(noteFile);
+  }
+}
+
 async function normalizeSyncedImageLocations(): Promise<void> {
   const syncedRoot = resolveSyncedNotesPath();
   const markdownFiles = await listMarkdownFilesRecursively(syncedRoot);
@@ -173,6 +186,10 @@ async function normalizeSyncedImageLocations(): Promise<void> {
   for (const noteFile of markdownFiles) {
     await organizeImageLinksInMarkdown(noteFile);
   }
+}
+
+async function normalizeSyncedNoteMetadata(): Promise<void> {
+  await ensureSyncedNotesMetadataRecursively(resolveSyncedNotesPath());
 }
 
 async function collectReferencedImagePaths(markdownFiles: string[]): Promise<Set<string>> {
@@ -269,57 +286,94 @@ function toUserFriendlySyncError(reason: string): string {
   return `Unable to sync notes right now. ${reason}`;
 }
 
+let syncInFlight: Promise<void> | null = null;
+let queuedSyncRequested = false;
+let queuedSyncNeedsPrompt = false;
+
+async function performSync(silent: boolean): Promise<void> {
+  const localOnlyMode = vscode.workspace.getConfiguration().get<boolean>('devnotes.localOnlyMode', false);
+  if (localOnlyMode) {
+    if (!silent) {
+      vscode.window.showInformationMessage('Local-only mode is enabled. Disable it to sync notes.');
+    }
+    return;
+  }
+
+  // Silent/background sync must never trigger interactive auth prompts.
+  const session = await getGitHubSession(!silent);
+  if (!session) {
+    if (!silent) {
+      vscode.window.showWarningMessage('GitHub authentication is required to sync notes.');
+    }
+    return;
+  }
+
+        await normalizeSyncedNoteMetadata();
+        await normalizeSyncedImageLocations();
+        await repairSyncedImageLinks();
+        await cleanupOrphanedAssetsImages();
+        const brokenImageLinks = await validateSyncedImageLinks();
+  if (brokenImageLinks.length > 0) {
+    const first = brokenImageLinks[0];
+    const brokenList = first.links.slice(0, 3).join(', ');
+    const fileName = path.basename(first.noteFile);
+    vscode.window.showErrorMessage(
+      `Sync blocked: missing image file(s) in ${fileName}: ${brokenList}. Use "Quick Notes: Insert Image Into Note" to copy image files into notes.`
+    );
+    return;
+  }
+
+  await syncNotesWithGitHub(session);
+  if (!silent) {
+    vscode.window.showInformationMessage(`Notes sync completed for ${session.account.label}.`);
+  }
+}
+
+async function runSyncWithQueue(initialSilent: boolean): Promise<void> {
+  let silent = initialSilent;
+
+  while (true) {
+    queuedSyncRequested = false;
+    queuedSyncNeedsPrompt = false;
+    await performSync(silent);
+
+    if (!queuedSyncRequested) {
+      return;
+    }
+
+    silent = !queuedSyncNeedsPrompt;
+  }
+}
+
 export function registerSyncNotesCommand(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('devnotes.syncNotes', async (arg?: unknown) => {
+      const silent = Boolean(
+        arg &&
+        typeof arg === 'object' &&
+        'silent' in arg &&
+        (arg as { silent?: unknown }).silent
+      );
+
+      if (syncInFlight) {
+        queuedSyncRequested = true;
+        queuedSyncNeedsPrompt = queuedSyncNeedsPrompt || !silent;
+        await syncInFlight;
+        return;
+      }
+
+      syncInFlight = runSyncWithQueue(silent);
+
       try {
-        const silent = Boolean(
-          arg &&
-          typeof arg === 'object' &&
-          'silent' in arg &&
-          (arg as { silent?: unknown }).silent
-        );
-
-        const localOnlyMode = vscode.workspace.getConfiguration().get<boolean>('devnotes.localOnlyMode', false);
-        if (localOnlyMode) {
-          if (!silent) {
-            vscode.window.showInformationMessage('Local-only mode is enabled. Disable it to sync notes.');
-          }
-          return;
-        }
-
-        // Silent/background sync must never trigger interactive auth prompts.
-        const session = await getGitHubSession(!silent);
-        if (!session) {
-          if (!silent) {
-            vscode.window.showWarningMessage('GitHub authentication is required to sync notes.');
-          }
-          return;
-        }
-
-        await normalizeSyncedImageLocations();
-        await cleanupOrphanedAssetsImages();
-        const brokenImageLinks = await validateSyncedImageLinks();
-        if (brokenImageLinks.length > 0) {
-          const first = brokenImageLinks[0];
-          const brokenList = first.links.slice(0, 3).join(', ');
-          const fileName = path.basename(first.noteFile);
-          vscode.window.showErrorMessage(
-            `Sync blocked: missing image file(s) in ${fileName}: ${brokenList}. Use "Quick Notes: Insert Image Into Note" to copy image files into notes.`
-          );
-          return;
-        }
-
-        await syncNotesWithGitHub(session);
-        if (!silent) {
-          vscode.window.showInformationMessage(`Notes sync completed for ${session.account.label}.`);
-        }
+        await syncInFlight;
       } catch (error) {
         logError('Failed to sync notes', error);
         const reason = error instanceof Error ? error.message : 'Unknown error';
-        if (!arg || typeof arg !== 'object' || !(arg as { silent?: unknown }).silent) {
+        if (!silent) {
           vscode.window.showErrorMessage(toUserFriendlySyncError(reason));
         }
+      } finally {
+        syncInFlight = null;
       }
     })
   );

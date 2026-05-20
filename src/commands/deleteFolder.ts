@@ -25,12 +25,20 @@ export function registerDeleteFolderCommand(context: vscode.ExtensionContext, no
         }
 
         await closeOpenTabsUnderDirectory(item.fullPath);
-        await fs.rm(item.fullPath, { recursive: true, force: false });
-        await maybeAutoSyncForPath(item.fullPath);
+        await fs.rm(item.fullPath, { recursive: true, force: true });
         notesProvider.refresh();
+
+        try {
+          await maybeAutoSyncForPath(item.fullPath);
+        } catch (syncError) {
+          logError('Folder deleted but sync failed afterward', syncError);
+          const reason = syncError instanceof Error ? syncError.message : 'Unknown sync error';
+          vscode.window.showWarningMessage(`Folder deleted locally, but sync could not finish: ${reason}`);
+        }
       } catch (error) {
         logError('Failed to delete folder', error);
-        vscode.window.showErrorMessage('Unable to delete folder.');
+        const reason = error instanceof Error ? error.message : 'Unknown error';
+        vscode.window.showErrorMessage(`Unable to delete folder. ${reason}`);
       }
     })
   );
