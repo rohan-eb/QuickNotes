@@ -3,26 +3,14 @@ import { NoteItem } from '../tree/noteItem';
 import { logError } from '../utils/logger';
 
 type ActionKey =
-  | 'open'
-  | 'rename'
-  | 'delete'
   | 'duplicate'
   | 'insertImage'
-  | 'reveal'
-  | 'moveToFolder'
-  | 'moveToSynced'
-  | 'moveToLocal';
+  | 'reveal';
 
 const ACTION_TO_COMMAND: Record<ActionKey, string> = {
-  open: 'devnotes.openNote',
-  rename: 'devnotes.renameNote',
-  delete: 'devnotes.deleteNote',
   duplicate: 'devnotes.duplicateNote',
   insertImage: 'devnotes.insertImageIntoNote',
-  reveal: 'devnotes.revealNoteInFolder',
-  moveToFolder: 'devnotes.moveNoteToFolder',
-  moveToSynced: 'devnotes.moveNoteToSynced',
-  moveToLocal: 'devnotes.moveNoteToLocal'
+  reveal: 'devnotes.revealNoteInFolder'
 };
 
 export function registerNoteActionsCommand(context: vscode.ExtensionContext): void {
@@ -34,23 +22,13 @@ export function registerNoteActionsCommand(context: vscode.ExtensionContext): vo
         }
 
         const actions: Array<{ label: string; value: ActionKey }> = [
-          { label: 'Open', value: 'open' },
-          { label: 'Rename', value: 'rename' },
-          { label: 'Delete', value: 'delete' },
           { label: 'Duplicate', value: 'duplicate' },
           { label: 'Insert Image', value: 'insertImage' },
-          { label: 'Reveal in Folder', value: 'reveal' },
-          { label: 'Move to Folder', value: 'moveToFolder' }
+          { label: 'Reveal in Folder', value: 'reveal' }
         ];
 
-        if (item.space === 'local') {
-          actions.push({ label: 'Move to Synced', value: 'moveToSynced' });
-        } else {
-          actions.push({ label: 'Move to Local', value: 'moveToLocal' });
-        }
-
         const selected = await vscode.window.showQuickPick(actions, {
-          placeHolder: `Actions for ${item.fileName}`
+          placeHolder: `More actions for ${item.fileName}`
         });
 
         if (!selected) {

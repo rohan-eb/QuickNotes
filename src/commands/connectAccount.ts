@@ -16,6 +16,7 @@ async function activateConnectedSession(
   await ensureDirectory(resolveSyncedNotesPath());
 
   const config = vscode.workspace.getConfiguration();
+  await config.update('devnotes.syncProvider', 'github', vscode.ConfigurationTarget.Global);
   await config.update('devnotes.activeAccountLabel', session.account.label, vscode.ConfigurationTarget.Global);
   await config.update('devnotes.localOnlyMode', false, vscode.ConfigurationTarget.Global);
   await config.update('devnotes.autoSync', true, vscode.ConfigurationTarget.Global);
@@ -183,6 +184,9 @@ export function registerDisconnectAccountCommand(context: vscode.ExtensionContex
         await config.update('devnotes.activeAccountLabel', '', vscode.ConfigurationTarget.Global);
         await config.update('devnotes.localOnlyMode', true, vscode.ConfigurationTarget.Global);
         await config.update('devnotes.autoSync', false, vscode.ConfigurationTarget.Global);
+        await config.update('devnotes.googleDriveAccessToken', '', vscode.ConfigurationTarget.Global);
+        await config.update('devnotes.googleDriveRefreshToken', '', vscode.ConfigurationTarget.Global);
+        await config.update('devnotes.googleDriveTokenExpiry', 0, vscode.ConfigurationTarget.Global);
 
         await closeOpenTabsUnderDirectory(resolveSyncedNotesPath());
 

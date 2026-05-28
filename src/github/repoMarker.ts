@@ -71,6 +71,14 @@ export async function assertRepoMarkerMatches(repoPath: string, config: RepoConf
     return;
   }
 
+  const repoAndBranchMatch = marker.repo === config.repoName && marker.branch === config.branch;
+  const ownerOrAccountDrift = marker.owner !== config.owner || marker.accountLogin !== config.accountLogin;
+  if (repoAndBranchMatch && ownerOrAccountDrift) {
+    // Auto-heal stale owner/account marker metadata when users reconnect with another GitHub account.
+    await writeRepoMarker(repoPath, config);
+    return;
+  }
+
   const mismatches: string[] = [];
   if (marker.owner !== config.owner) {
     mismatches.push(`owner=${marker.owner}`);

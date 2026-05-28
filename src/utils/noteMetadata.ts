@@ -9,14 +9,16 @@ const COMMENT_START = '<!-- quicknotes-sync';
 const COMMENT_END = '-->';
 const DO_NOT_DELETE_LINE = 'do-not-delete: true';
 const NOTE_METADATA_MTIME_TOLERANCE_MS = 2_000;
+const SIDECAR_FILE_NAME = '.quicknotes-metadata.json';
 
-type MetadataFieldKey = 'quicknotesId' | 'createdAt' | 'updatedAt' | 'source';
+type MetadataFieldKey = 'quicknotesId' | 'createdAt' | 'updatedAt' | 'source' | 'pinned';
 
 export interface SyncedNoteMetadata {
   quicknotesId: string;
   createdAt: string;
   updatedAt: string;
   source: string;
+  pinned: boolean;
 }
 
 interface MetadataBlock {
@@ -27,11 +29,45 @@ interface MetadataBlock {
   prefix: string;
 }
 
+type SidecarStore = Record<string, SyncedNoteMetadata>;
+
 function isInsideDirectory(filePath: string, rootDir: string): boolean {
   const resolvedFile = path.resolve(filePath);
   const resolvedRoot = path.resolve(rootDir);
   const relative = path.relative(resolvedRoot, resolvedFile);
   return relative.length > 0 && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+function normalizeRelativePath(value: string): string {
+  return value.replace(/\\/g, '/').replace(/^\/+/, '');
+}
+
+function getSidecarFilePath(rootDir: string): string {
+  return path.join(rootDir, SIDECAR_FILE_NAME);
+}
+
+function getSidecarKeyForFile(filePath: string): string {
+  return normalizeRelativePath(path.relative(resolveSyncedNotesPath(), filePath));
+}
+
+async function readSidecarStore(rootDir: string): Promise<SidecarStore> {
+  const filePath = getSidecarFilePath(rootDir);
+  try {
+    const raw = await fs.readFile(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') {
+      return {};
+    }
+    return parsed as SidecarStore;
+  } catch {
+    return {};
+  }
+}
+
+async function writeSidecarStore(rootDir: string, store: SidecarStore): Promise<void> {
+  const filePath = getSidecarFilePath(rootDir);
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, JSON.stringify(store, null, 2), 'utf8');
 }
 
 export function isSyncedMarkdownNote(filePath: string): boolean {
@@ -110,6 +146,11 @@ function readMetadataValue(metadataRaw: string, key: MetadataFieldKey): string |
   return match?.[1]?.trim();
 }
 
+function parsePinnedValue(value: string | undefined): boolean {
+  const input = (value || '').trim().toLowerCase();
+  return input === 'true' || input === '1' || input === 'yes';
+}
+
 function upsertMetadataValue(lines: string[], key: MetadataFieldKey, value: string): string[] {
   const nextLine = `${key}: ${value}`;
   const existingIndex = lines.findIndex((line) => new RegExp(`^${key}:\\s*`).test(line));
@@ -122,17 +163,9 @@ function upsertMetadataValue(lines: string[], key: MetadataFieldKey, value: stri
   return [...lines, nextLine];
 }
 
-function buildDocumentWithMetadata(documentText: string, metadata: SyncedNoteMetadata): string {
+function stripMetadataFromDocument(documentText: string): string {
   const split = splitMetadataBlock(documentText);
-  let lines = split.metadataLines.filter((line) => !/^do-not-delete:\s*/.test(line.trim()));
-  lines = upsertMetadataValue(lines, 'quicknotesId', metadata.quicknotesId);
-  lines = upsertMetadataValue(lines, 'createdAt', metadata.createdAt);
-  lines = upsertMetadataValue(lines, 'updatedAt', metadata.updatedAt);
-  lines = upsertMetadataValue(lines, 'source', metadata.source);
-  lines.push(DO_NOT_DELETE_LINE);
-
-  const body = split.body.replace(/^\n*/, '');
-  return `${COMMENT_START}\n${lines.join('\n')}\n${COMMENT_END}\n\n${body}`;
+  return split.found ? split.body.replace(/^\n*/, '') : documentText;
 }
 
 function sanitizeTimestamp(value: string | undefined, fallback: Date): string {
@@ -155,17 +188,28 @@ async function readMetadataState(filePath: string): Promise<{
 }> {
   const [documentText, stats] = await Promise.all([fs.readFile(filePath, 'utf8'), fs.stat(filePath)]);
   const split = splitMetadataBlock(documentText);
+  const rootDir = resolveSyncedNotesPath();
+  const sidecar = await readSidecarStore(rootDir);
+  const sidecarMetadata = sidecar[getSidecarKeyForFile(filePath)] || null;
 
   return {
     documentText,
     stats,
     metadata: {
-      quicknotesId: readMetadataValue(split.metadataRaw, 'quicknotesId'),
-      createdAt: readMetadataValue(split.metadataRaw, 'createdAt'),
-      updatedAt: readMetadataValue(split.metadataRaw, 'updatedAt'),
-      source: readMetadataValue(split.metadataRaw, 'source')
+      quicknotesId: sidecarMetadata?.quicknotesId || readMetadataValue(split.metadataRaw, 'quicknotesId'),
+      createdAt: sidecarMetadata?.createdAt || readMetadataValue(split.metadataRaw, 'createdAt'),
+      updatedAt: sidecarMetadata?.updatedAt || readMetadataValue(split.metadataRaw, 'updatedAt'),
+      source: sidecarMetadata?.source || readMetadataValue(split.metadataRaw, 'source'),
+      pinned: typeof sidecarMetadata?.pinned === 'boolean'
+        ? sidecarMetadata.pinned
+        : parsePinnedValue(readMetadataValue(split.metadataRaw, 'pinned'))
     }
   };
+}
+
+export async function readNoteMetadata(filePath: string): Promise<Partial<SyncedNoteMetadata>> {
+  const { metadata } = await readMetadataState(filePath);
+  return metadata;
 }
 
 function shouldRefreshUpdatedAt(existingUpdatedAt: string | undefined, stats: Awaited<ReturnType<typeof fs.stat>>): boolean {
@@ -206,32 +250,76 @@ export async function ensureSyncedNoteMetadata(
       ? now.toISOString()
       : sanitizeTimestamp(existing.createdAt, stats.birthtime),
     updatedAt: shouldUpdateTimestamp ? now.toISOString() : sanitizeTimestamp(existing.updatedAt, stats.mtime),
-    source: (options?.source || existing.source || 'vscode').trim() || 'vscode'
+    source: (options?.source || existing.source || 'vscode').trim() || 'vscode',
+    pinned: Boolean(existing.pinned)
   };
 
-  const nextDocument = buildDocumentWithMetadata(documentText, nextMetadata);
-  if (nextDocument === documentText) {
+  const rootDir = resolveSyncedNotesPath();
+  const sidecar = await readSidecarStore(rootDir);
+  const sidecarKey = getSidecarKeyForFile(filePath);
+  const previousSerialized = JSON.stringify(sidecar[sidecarKey] || {});
+  sidecar[sidecarKey] = nextMetadata;
+  const nextSerialized = JSON.stringify(sidecar[sidecarKey]);
+  const strippedDocument = stripMetadataFromDocument(documentText);
+  const markdownChanged = strippedDocument !== documentText;
+  const metadataChanged = previousSerialized !== nextSerialized;
+
+  if (!markdownChanged && !metadataChanged) {
     return false;
   }
 
-  await fs.writeFile(filePath, nextDocument, 'utf8');
-  return true;
+  if (markdownChanged) {
+    await fs.writeFile(filePath, strippedDocument, 'utf8');
+  }
+  if (metadataChanged) {
+    await writeSidecarStore(rootDir, sidecar);
+  }
+  return markdownChanged || metadataChanged;
+}
+
+export async function updateNotePinned(
+  filePath: string,
+  pinned: boolean,
+  options?: {
+    source?: string;
+    forceUpdatedAt?: boolean;
+  }
+): Promise<boolean> {
+  const { documentText, metadata: existing, stats } = await readMetadataState(filePath);
+  const now = new Date();
+  const nextMetadata: SyncedNoteMetadata = {
+    quicknotesId: existing.quicknotesId || randomUUID(),
+    createdAt: sanitizeTimestamp(existing.createdAt, stats.birthtime),
+    updatedAt: options?.forceUpdatedAt ? now.toISOString() : sanitizeTimestamp(existing.updatedAt, stats.mtime),
+    source: (options?.source || existing.source || 'vscode').trim() || 'vscode',
+    pinned
+  };
+
+  const rootDir = resolveSyncedNotesPath();
+  const sidecar = await readSidecarStore(rootDir);
+  const sidecarKey = getSidecarKeyForFile(filePath);
+  const previousSerialized = JSON.stringify(sidecar[sidecarKey] || {});
+  sidecar[sidecarKey] = nextMetadata;
+  const nextSerialized = JSON.stringify(sidecar[sidecarKey]);
+  const strippedDocument = stripMetadataFromDocument(documentText);
+  const markdownChanged = strippedDocument !== documentText;
+  const metadataChanged = previousSerialized !== nextSerialized;
+
+  if (!markdownChanged && !metadataChanged) {
+    return false;
+  }
+  if (markdownChanged) {
+    await fs.writeFile(filePath, strippedDocument, 'utf8');
+  }
+  if (metadataChanged) {
+    await writeSidecarStore(rootDir, sidecar);
+  }
+  return markdownChanged || metadataChanged;
 }
 
 export function buildInitialNoteDocument(fileName: string, options?: { includeMetadata?: boolean; source?: string }): string {
   const baseName = fileName.replace(/\.md$/i, '');
-  const body = `# ${baseName}\n\n`;
-  if (!options?.includeMetadata) {
-    return body;
-  }
-
-  const now = new Date().toISOString();
-  return buildDocumentWithMetadata(body, {
-    quicknotesId: randomUUID(),
-    createdAt: now,
-    updatedAt: now,
-    source: options.source?.trim() || 'vscode'
-  });
+  return `# ${baseName}\n\n`;
 }
 
 export async function ensureSyncedNotesMetadataRecursively(rootDir: string): Promise<void> {
