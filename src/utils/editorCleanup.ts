@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
 import * as vscode from 'vscode';
 
 function isInsideDirectory(filePath: string, rootDir: string): boolean {
@@ -44,4 +45,39 @@ export async function closeOpenTabForFile(filePath: string): Promise<boolean> {
   }
 
   return false;
+}
+
+export async function closeMissingTabsUnderDirectories(rootDirs: string[]): Promise<number> {
+  const resolvedRoots = rootDirs.map((rootDir) => path.resolve(rootDir));
+  const tabsToClose: vscode.Tab[] = [];
+
+  for (const group of vscode.window.tabGroups.all) {
+    for (const tab of group.tabs) {
+      const input = tab.input;
+      if (!(input instanceof vscode.TabInputText)) {
+        continue;
+      }
+
+      const filePath = path.resolve(input.uri.fsPath);
+      const isManagedNoteTab = resolvedRoots.some((rootDir) => isInsideDirectory(filePath, rootDir));
+      if (!isManagedNoteTab) {
+        continue;
+      }
+
+      const exists = await fs.access(filePath).then(
+        () => true,
+        () => false
+      );
+      if (!exists) {
+        tabsToClose.push(tab);
+      }
+    }
+  }
+
+  if (tabsToClose.length === 0) {
+    return 0;
+  }
+
+  await vscode.window.tabGroups.close(tabsToClose);
+  return tabsToClose.length;
 }

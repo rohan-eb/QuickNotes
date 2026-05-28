@@ -8,12 +8,14 @@ export class NoteItem extends vscode.TreeItem {
     public readonly label: string,
     public readonly fileName: string,
     public readonly fullPath: string,
-    public readonly space: NoteSpace
+    public readonly space: NoteSpace,
+    public readonly pinned: boolean = false,
+    descriptionText?: string
   ) {
     super(label, vscode.TreeItemCollapsibleState.None);
 
     this.contextValue = `noteItem.${space}`;
-    this.description = label === fileName ? undefined : fileName;
+    this.description = descriptionText;
     this.command = {
       command: 'devnotes.openNote',
       title: 'Open Note',
@@ -74,6 +76,14 @@ export class SectionItem extends vscode.TreeItem {
   }
 }
 
+export class PinnedGroupItem extends vscode.TreeItem {
+  constructor(public readonly space: NoteSpace) {
+    super('Pinned', vscode.TreeItemCollapsibleState.Expanded);
+    this.contextValue = `pinnedGroupItem.${space}`;
+    this.iconPath = new vscode.ThemeIcon('pinned');
+  }
+}
+
 export class SpacerItem extends vscode.TreeItem {
   constructor() {
     super(' ', vscode.TreeItemCollapsibleState.None);
@@ -81,4 +91,11 @@ export class SpacerItem extends vscode.TreeItem {
   }
 }
 
-export type SidebarItem = NoteItem | FolderItem | ActionItem | AccountItem | SectionItem | SpacerItem;
+export type SidebarItem =
+  | NoteItem
+  | FolderItem
+  | ActionItem
+  | AccountItem
+  | SectionItem
+  | PinnedGroupItem
+  | SpacerItem;

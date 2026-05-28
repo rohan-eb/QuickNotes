@@ -11,6 +11,19 @@ import { ensureSyncedNoteMetadata } from '../utils/noteMetadata';
 import { resolveLocalNotesPath, resolveSyncedNotesPath } from '../utils/paths';
 import { maybeAutoSyncForPath } from '../utils/syncTrigger';
 
+const ARCHIVE_DIRECTORY_NAME = '.quicknotes-archive';
+const BROWSER_INBOX_DIRECTORY_NAME = 'browser-inbox';
+
+function isInternalDirectoryName(name: string): boolean {
+  return (
+    name === '.git' ||
+    name === 'assets' ||
+    name === 'accounts' ||
+    name === ARCHIVE_DIRECTORY_NAME ||
+    name === BROWSER_INBOX_DIRECTORY_NAME
+  );
+}
+
 function rootForSpace(space: NoteSpace): string {
   return space === 'synced' ? resolveSyncedNotesPath() : resolveLocalNotesPath();
 }
@@ -19,7 +32,7 @@ async function listFoldersRecursively(rootDir: string): Promise<string[]> {
   const result: string[] = [rootDir];
   const entries = await fs.readdir(rootDir, { withFileTypes: true });
   for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name === '.git' || entry.name === 'assets' || entry.name === 'accounts') {
+    if (!entry.isDirectory() || isInternalDirectoryName(entry.name)) {
       continue;
     }
     const fullPath = path.join(rootDir, entry.name);

@@ -9,17 +9,26 @@ export function registerAccountMenuCommand(context: vscode.ExtensionContext): vo
         const config = vscode.workspace.getConfiguration();
         const localOnlyMode = config.get<boolean>('devnotes.localOnlyMode', false);
         const activeAccountKey = config.get<string>('devnotes.activeAccountKey', '').trim();
+        const syncProvider = config.get<string>('devnotes.syncProvider', 'github').trim();
+        const driveToken = config.get<string>('devnotes.googleDriveAccessToken', '').trim();
         const session = await getGitHubSession(false);
-        const syncConnected = Boolean(session) && !localOnlyMode && activeAccountKey.length > 0;
-        const currentLabel = syncConnected ? session!.account.label : localOnlyMode ? 'Local-only mode' : 'Not connected';
+        const githubConnected = Boolean(session) && activeAccountKey.length > 0 && syncProvider === 'github';
+        const googleConnected = driveToken.length > 0 && activeAccountKey.length > 0 && syncProvider === 'googleDrive';
+        const syncConnected = (githubConnected || googleConnected) && !localOnlyMode;
+        const currentLabel = syncConnected
+          ? (syncProvider === 'googleDrive' ? 'Google Drive' : session?.account.label || 'GitHub')
+          : localOnlyMode
+            ? 'Local-only mode'
+            : 'Not connected';
 
         const picks = syncConnected
           ? [
-              { label: 'Switch Account', value: 'switch', detail: 'Connect a different GitHub account' },
+              { label: 'Switch Account', value: 'switch', detail: 'Switch connected provider/account' },
               { label: 'Disconnect Account', value: 'disconnect', detail: 'Disable sync and continue local-only' }
             ]
           : [
-              { label: 'Connect Account', value: 'connect', detail: 'Sign in with GitHub' }
+              { label: 'Connect GitHub', value: 'connect-github', detail: 'Sign in with GitHub' },
+              { label: 'Connect Google Drive', value: 'connect-google', detail: 'Sign in with Google Drive' }
             ];
 
         const selected = await vscode.window.showQuickPick(
@@ -31,17 +40,32 @@ export function registerAccountMenuCommand(context: vscode.ExtensionContext): vo
           return;
         }
 
-        if (selected.value === 'connect') {
+        if (selected.value === 'connect-github') {
           await vscode.commands.executeCommand('devnotes.connectAccount');
           return;
         }
 
+        if (selected.value === 'connect-google') {
+          await vscode.commands.executeCommand('devnotes.connectGoogleDrive');
+          return;
+        }
+
         if (selected.value === 'switch') {
-          if (!syncConnected) {
-            await vscode.commands.executeCommand('devnotes.connectAccount');
+          const provider = await vscode.window.showQuickPick(
+            [
+              { label: 'GitHub', value: 'github', detail: 'Use GitHub as active sync provider' },
+              { label: 'Google Drive', value: 'googleDrive', detail: 'Use Google Drive as active sync provider' }
+            ],
+            { placeHolder: 'Select sync provider' }
+          );
+          if (!provider) {
             return;
           }
-          await vscode.commands.executeCommand('devnotes.switchAccount');
+          if (provider.value === 'googleDrive') {
+            await vscode.commands.executeCommand('devnotes.connectGoogleDrive');
+          } else {
+            await vscode.commands.executeCommand('devnotes.switchAccount');
+          }
           return;
         }
 

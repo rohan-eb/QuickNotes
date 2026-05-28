@@ -3,14 +3,25 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { getGitHubSession } from '../github/auth';
 import { syncNotesWithGitHub } from '../github/gitSync';
+import { reconcileGoogleDriveSyncState, syncNotesWithGoogleDrive } from '../googleDrive/driveSync';
+import { getValidGoogleDriveAccessToken } from '../googleDrive/auth';
 import { isConflictBackupNotePath } from '../utils/conflictBackups';
 import { logError } from '../utils/logger';
 import { findBrokenImageLinks, repairBrokenLocalImageLinks } from '../utils/markdownImages';
 import { ensureSyncedNotesMetadataRecursively } from '../utils/noteMetadata';
 import { resolveSyncedNotesPath } from '../utils/paths';
 
+const ARCHIVE_DIRECTORY_NAME = '.quicknotes-archive';
+
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp']);
 const MARKDOWN_IMAGE_REGEX = /!\[([^\]]*)]\(([^)]+)\)/g;
+export type SyncHealthState = 'Synced' | 'Syncing' | 'Offline' | 'Conflict';
+
+interface SyncHealthStatus {
+  state: SyncHealthState;
+  detail: string;
+  updatedAt: string;
+}
 
 function stripLinkDecorators(raw: string): string {
   const trimmed = raw.trim();
@@ -161,6 +172,9 @@ async function validateSyncedImageLinks(): Promise<{ noteFile: string; links: st
   const broken: Array<{ noteFile: string; links: string[] }> = [];
 
   for (const noteFile of markdownFiles) {
+    if (noteFile.includes(`${path.sep}${ARCHIVE_DIRECTORY_NAME}${path.sep}`)) {
+      continue;
+    }
     const links = await findBrokenImageLinks(noteFile);
     if (links.length > 0) {
       broken.push({ noteFile, links });
@@ -216,7 +230,7 @@ async function collectReferencedImagePaths(markdownFiles: string[]): Promise<Set
   return referenced;
 }
 
-async function listAssetsImageFiles(rootDir: string): Promise<string[]> {
+async function listImageFilesRecursively(rootDir: string): Promise<string[]> {
   const entries = await fs.readdir(rootDir, { withFileTypes: true });
   const files: string[] = [];
 
@@ -226,21 +240,17 @@ async function listAssetsImageFiles(rootDir: string): Promise<string[]> {
       if (entry.name === '.git') {
         continue;
       }
-      if (entry.name === 'assets') {
-        const assetEntries = await fs.readdir(fullPath, { withFileTypes: true });
-        for (const assetEntry of assetEntries) {
-          if (!assetEntry.isFile()) {
-            continue;
-          }
-          const assetPath = path.join(fullPath, assetEntry.name);
-          const ext = path.extname(assetPath).toLowerCase();
-          if (IMAGE_EXTENSIONS.has(ext)) {
-            files.push(assetPath);
-          }
-        }
+      if (entry.name === '.quicknotes-archive') {
         continue;
       }
-      files.push(...(await listAssetsImageFiles(fullPath)));
+      files.push(...(await listImageFilesRecursively(fullPath)));
+      continue;
+    }
+    if (entry.isFile()) {
+      const ext = path.extname(fullPath).toLowerCase();
+      if (IMAGE_EXTENSIONS.has(ext)) {
+        files.push(fullPath);
+      }
     }
   }
 
@@ -251,7 +261,7 @@ async function cleanupOrphanedAssetsImages(): Promise<void> {
   const syncedRoot = resolveSyncedNotesPath();
   const markdownFiles = await listMarkdownFilesRecursively(syncedRoot);
   const referenced = await collectReferencedImagePaths(markdownFiles);
-  const assetImages = await listAssetsImageFiles(syncedRoot);
+  const assetImages = await listImageFilesRecursively(syncedRoot);
 
   for (const imagePath of assetImages) {
     if (!referenced.has(path.resolve(imagePath))) {
@@ -289,24 +299,81 @@ function toUserFriendlySyncError(reason: string): string {
 let syncInFlight: Promise<void> | null = null;
 let queuedSyncRequested = false;
 let queuedSyncNeedsPrompt = false;
+let currentSyncHealthStatus: SyncHealthStatus = {
+  state: 'Offline',
+  detail: 'Connect a sync provider to sync QuickNotes.',
+  updatedAt: new Date(0).toISOString()
+};
+
+function setSyncHealthStatus(state: SyncHealthState, detail: string): void {
+  currentSyncHealthStatus = {
+    state,
+    detail,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+export function getCurrentSyncHealthStatus(): SyncHealthStatus {
+  return currentSyncHealthStatus;
+}
+
+function getSyncRecoveryHint(reason: string): { state: SyncHealthState; detail: string } {
+  const lower = reason.toLowerCase();
+
+  if (lower.includes('sync conflict detected')) {
+    return {
+      state: 'Conflict',
+      detail: `${reason} Review the generated .local/.remote backups, keep the version you want, then run sync again.`
+    };
+  }
+
+  if (
+    lower.includes('authentication') ||
+    lower.includes('401') ||
+    lower.includes('403') ||
+    lower.includes('connect a github account') ||
+    lower.includes('google drive access token')
+  ) {
+    return {
+      state: 'Offline',
+      detail: 'Provider authentication needs attention. Reconnect and retry sync.'
+    };
+  }
+
+  return {
+    state: 'Offline',
+    detail: 'GitHub is unreachable right now. Your notes are still local; reconnect and retry sync when online.'
+  };
+}
 
 async function performSync(silent: boolean): Promise<void> {
   const localOnlyMode = vscode.workspace.getConfiguration().get<boolean>('devnotes.localOnlyMode', false);
   if (localOnlyMode) {
+    setSyncHealthStatus('Offline', 'Local-only mode is enabled. Disable it to sync notes.');
     if (!silent) {
       vscode.window.showInformationMessage('Local-only mode is enabled. Disable it to sync notes.');
     }
     return;
   }
 
-  // Silent/background sync must never trigger interactive auth prompts.
-  const session = await getGitHubSession(!silent);
-  if (!session) {
-    if (!silent) {
-      vscode.window.showWarningMessage('GitHub authentication is required to sync notes.');
+  const provider = vscode.workspace.getConfiguration().get<string>('devnotes.syncProvider', 'github').trim();
+  const useGoogleDrive = provider === 'googleDrive';
+
+  let accountLabel = 'Google Drive';
+  if (!useGoogleDrive) {
+    // Silent/background sync must never trigger interactive auth prompts.
+    const session = await getGitHubSession(!silent);
+    if (!session) {
+      setSyncHealthStatus('Offline', 'GitHub is not connected. Connect your account to resume syncing.');
+      if (!silent) {
+        vscode.window.showWarningMessage('GitHub authentication is required to sync notes.');
+      }
+      return;
     }
-    return;
+    accountLabel = session.account.label;
   }
+
+  setSyncHealthStatus('Syncing', `Syncing QuickNotes with ${useGoogleDrive ? 'Google Drive' : 'GitHub'} for ${accountLabel}...`);
 
         await normalizeSyncedNoteMetadata();
         await normalizeSyncedImageLocations();
@@ -317,15 +384,46 @@ async function performSync(silent: boolean): Promise<void> {
     const first = brokenImageLinks[0];
     const brokenList = first.links.slice(0, 3).join(', ');
     const fileName = path.basename(first.noteFile);
-    vscode.window.showErrorMessage(
-      `Sync blocked: missing image file(s) in ${fileName}: ${brokenList}. Use "Quick Notes: Insert Image Into Note" to copy image files into notes.`
+    vscode.window.showWarningMessage(
+      `Sync warning: missing image file(s) in ${fileName}: ${brokenList}. QuickNotes will keep syncing the note text.`
     );
-    return;
   }
 
-  await syncNotesWithGitHub(session);
+  if (useGoogleDrive) {
+    const accessToken = (await getValidGoogleDriveAccessToken()).trim();
+    if (!accessToken) {
+      setSyncHealthStatus('Offline', 'Google Drive access token is missing. Connect Google Drive to resume syncing.');
+      if (!silent) {
+        vscode.window.showWarningMessage('Google Drive access token is required to sync notes.');
+      }
+      return;
+    }
+    await syncNotesWithGoogleDrive(accessToken);
+  } else {
+    const session = await getGitHubSession(!silent);
+    if (!session) {
+      setSyncHealthStatus('Offline', 'GitHub is not connected. Connect your account to resume syncing.');
+      if (!silent) {
+        vscode.window.showWarningMessage('GitHub authentication is required to sync notes.');
+      }
+      return;
+    }
+    await syncNotesWithGitHub(session);
+  }
+
+  // Post-sync normalization: downloaded remote notes can still contain legacy metadata blocks.
+  // Run cleanup again after provider sync so markdown stays stable for users.
+  await normalizeSyncedNoteMetadata();
+  await normalizeSyncedImageLocations();
+  await repairSyncedImageLinks();
+  await cleanupOrphanedAssetsImages();
+  if (useGoogleDrive) {
+    await reconcileGoogleDriveSyncState();
+  }
+
+  setSyncHealthStatus('Synced', `Last sync completed for ${accountLabel}.`);
   if (!silent) {
-    vscode.window.showInformationMessage(`Notes sync completed for ${session.account.label}.`);
+    vscode.window.showInformationMessage(`Notes sync completed for ${accountLabel}.`);
   }
 }
 
@@ -369,6 +467,8 @@ export function registerSyncNotesCommand(context: vscode.ExtensionContext): void
       } catch (error) {
         logError('Failed to sync notes', error);
         const reason = error instanceof Error ? error.message : 'Unknown error';
+        const recovery = getSyncRecoveryHint(reason);
+        setSyncHealthStatus(recovery.state, recovery.detail);
         if (!silent) {
           vscode.window.showErrorMessage(toUserFriendlySyncError(reason));
         }

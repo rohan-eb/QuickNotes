@@ -237,8 +237,9 @@ async function hasLocalHead(repoPath: string): Promise<boolean> {
 }
 
 async function hasSyncableChanges(repoPath: string): Promise<boolean> {
-  // Use NUL-delimited porcelain output for robust parsing of nested/quoted paths.
-  const status = await runGit(repoPath, ['status', '--porcelain', '-z']);
+  // Include all untracked files (not just directory placeholders) so new notes
+  // inside freshly-created folders are detected and committed.
+  const status = await runGit(repoPath, ['status', '--porcelain', '-z', '-uall']);
   const records = status.stdout.split('\0').filter(Boolean);
 
   for (let i = 0; i < records.length; i += 1) {
@@ -267,7 +268,9 @@ async function hasSyncableChanges(repoPath: string): Promise<boolean> {
 }
 
 async function listChangedSyncablePaths(repoPath: string): Promise<string[]> {
-  const status = await runGit(repoPath, ['status', '--porcelain', '-z']);
+  // Include all untracked files (not just directory placeholders) so staged
+  // path calculation includes note files within new folders.
+  const status = await runGit(repoPath, ['status', '--porcelain', '-z', '-uall']);
   const records = status.stdout.split('\0').filter(Boolean);
   const changedPaths: string[] = [];
 

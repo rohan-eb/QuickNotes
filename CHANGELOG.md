@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.0.7] - 2026-05-26
+
+### Added
+
+- Automatic sync identity recovery for stale `.quicknotes-sync.json` metadata after GitHub account reconnect/switch.
+- Canonical sync identity recovery documentation with cross-repo QA flow references.
+
+### Improved
+
+- Provider-aware wording and release docs updated across README and product docs to match current GitHub + Google Drive support.
+
+## [0.0.6] - 2026-05-21
+
+### Improved
+
+- Continued Release-Now UX polish across VS Code and Chrome surfaces.
+- Updated packaging/version metadata for the next Marketplace-ready build.
+
 ## [0.0.5] - 2026-05-19
 
 ### Improved

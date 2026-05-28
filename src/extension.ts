@@ -7,6 +7,7 @@ import {
 } from './commands/connectAccount';
 import { registerAccountMenuCommand } from './commands/accountMenu';
 import { registerConnectGitHubCommand } from './commands/connectGitHub';
+import { registerConnectGoogleDriveCommand } from './commands/connectGoogleDrive';
 import { registerContinueLocalOnlyCommand } from './commands/continueLocalOnly';
 import { registerCopyNotePathCommand } from './commands/copyNotePath';
 import { registerCreateNoteCommand } from './commands/createNote';
@@ -19,6 +20,7 @@ import { registerDuplicateNoteCommand } from './commands/duplicateNote';
 import { registerMoveNoteSpaceCommands } from './commands/moveNoteSpace';
 import { registerMoveNoteToFolderCommand } from './commands/moveNoteToFolder';
 import { registerMoveFolderCommand } from './commands/moveFolder';
+import { registerNoteActionsCommand } from './commands/noteActions';
 import { registerOpenNoteCommand } from './commands/openNote';
 import { registerOpenNotesFolderCommand } from './commands/openNotesFolder';
 import { registerInsertImageIntoNoteCommand } from './commands/insertImageIntoNote';
@@ -30,10 +32,11 @@ import { registerResetSyncedWarningCommand } from './commands/resetSyncedWarning
 import { registerSetupNoteHubCommand } from './commands/setupNoteHub';
 import { registerSyncNotesCommand } from './commands/syncNotes';
 import { registerSyncStatusCommand } from './commands/syncStatus';
+import { registerTogglePinCommand } from './commands/togglePin';
 import { ensureDirectory } from './storage/localStorage';
 import { NotesProvider } from './tree/notesProvider';
 import { getGitHubSession } from './github/auth';
-import { closeOpenTabsUnderDirectory } from './utils/editorCleanup';
+import { closeMissingTabsUnderDirectories, closeOpenTabForFile, closeOpenTabsUnderDirectory } from './utils/editorCleanup';
 import { initializeLogger, logError, logInfo } from './utils/logger';
 import { ensureSyncedNoteMetadata } from './utils/noteMetadata';
 import { resolveLocalNotesPath, resolveSyncedNotesBasePath, resolveSyncedNotesPath } from './utils/paths';
@@ -64,11 +67,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       notesProvider.refresh();
     };
 
+    const reconcileManagedNoteTabs = async (): Promise<void> => {
+      await closeMissingTabsUnderDirectories([resolveSyncedNotesBasePath(), resolveLocalNotesPath()]);
+      refreshNotesTree();
+    };
+
+    const handleExternalDelete = async (uri: vscode.Uri): Promise<void> => {
+      try {
+        const deletedPath = uri.fsPath;
+        const extension = path.extname(deletedPath).toLowerCase();
+        if (extension === '.md') {
+          await closeOpenTabForFile(deletedPath);
+        } else {
+          await closeOpenTabsUnderDirectory(deletedPath);
+        }
+      } finally {
+        refreshNotesTree();
+      }
+    };
+
     for (const watcher of [syncedWatcher, localWatcher]) {
       context.subscriptions.push(watcher);
-      context.subscriptions.push(watcher.onDidCreate(refreshNotesTree));
-      context.subscriptions.push(watcher.onDidChange(refreshNotesTree));
-      context.subscriptions.push(watcher.onDidDelete(refreshNotesTree));
+      context.subscriptions.push(watcher.onDidCreate(reconcileManagedNoteTabs));
+      context.subscriptions.push(watcher.onDidChange(reconcileManagedNoteTabs));
+      context.subscriptions.push(watcher.onDidDelete(handleExternalDelete));
     }
 
     const treeRefreshIntervalMs = 5_000;
@@ -126,6 +148,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       })
     );
     registerConnectGitHubCommand(context);
+    registerConnectGoogleDriveCommand(context);
     registerConnectAccountCommand(context, notesProvider);
     registerSwitchAccountCommand(context, notesProvider);
     registerDisconnectAccountCommand(context, notesProvider);
@@ -137,9 +160,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     registerDeleteNoteCommand(context, notesProvider);
     registerDeleteFolderCommand(context, notesProvider);
     registerDuplicateNoteCommand(context, notesProvider);
+    registerTogglePinCommand(context, notesProvider);
     registerMoveNoteSpaceCommands(context, notesProvider);
     registerMoveNoteToFolderCommand(context, notesProvider);
     registerMoveFolderCommand(context, notesProvider);
+    registerNoteActionsCommand(context);
     registerRenameFolderCommand(context, notesProvider);
     registerRevealNoteInFolderCommand(context);
     registerCopyNotePathCommand(context);

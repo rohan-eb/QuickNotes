@@ -53,6 +53,7 @@ export function registerCreateNoteCommand(context: vscode.ExtensionContext, note
           includeMetadata: space === 'synced',
           source: 'vscode'
         });
+
         await maybeAutoSyncForPath(fullPath);
 
         const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(fullPath));

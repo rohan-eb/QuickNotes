@@ -33,7 +33,7 @@ export function registerOpenNoteCommand(context: vscode.ExtensionContext): void 
       try {
         const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(item.fullPath));
         const editor = await vscode.window.showTextDocument(doc);
-        if (isSyncedMarkdownNote(item.fullPath)) {
+        if (isSyncedMarkdownNote(item.fullPath) || getSyncedNoteBodyStartLine(doc.getText()) > 0) {
           await focusNoteBody(editor);
         }
       } catch (error) {

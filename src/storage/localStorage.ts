@@ -75,3 +75,9 @@ export async function moveNoteToDirectory(sourcePath: string, targetDirPath: str
   await fs.rename(sourcePath, destinationPath);
   return destinationPath;
 }
+
+export async function moveNoteByPath(sourcePath: string, destinationPath: string): Promise<string> {
+  await ensureDirectory(path.dirname(destinationPath));
+  await fs.rename(sourcePath, destinationPath);
+  return destinationPath;
+}

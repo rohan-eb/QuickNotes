@@ -3,6 +3,7 @@ import * as path from 'node:path';
 
 const MARKDOWN_IMAGE_REGEX = /!\[[^\]]*]\(([^)]+)\)/g;
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp']);
+const ARCHIVE_DIRECTORY_NAME = '.quicknotes-archive';
 
 function stripLinkDecorators(raw: string): string {
   const trimmed = raw.trim();
@@ -33,6 +34,19 @@ async function pathExists(targetPath: string): Promise<boolean> {
 
 function toMarkdownPath(filePath: string): string {
   return filePath.replace(/\\/g, '/');
+}
+
+function resolveMirroredActivePath(noteDir: string, relativeImagePath: string): string | undefined {
+  const resolvedNoteDir = path.resolve(noteDir);
+  const parts = resolvedNoteDir.split(path.sep);
+  const archiveIndex = parts.lastIndexOf(ARCHIVE_DIRECTORY_NAME);
+  if (archiveIndex < 0) {
+    return undefined;
+  }
+
+  const root = path.parse(resolvedNoteDir).root;
+  const activeDir = path.join(root, ...parts.slice(1, archiveIndex), ...parts.slice(archiveIndex + 1));
+  return path.resolve(activeDir, relativeImagePath);
 }
 
 async function getUniqueTargetPath(basePath: string): Promise<string> {
@@ -163,6 +177,20 @@ export async function repairBrokenLocalImageLinks(markdownFilePath: string): Pro
     const fileName = path.basename(normalizedPath).toLowerCase();
     const matchedAssetName = assetFiles.get(fileName);
     if (!matchedAssetName) {
+      const mirroredImagePath = resolveMirroredActivePath(noteDir, normalizedPath);
+      if (!mirroredImagePath || !(await pathExists(mirroredImagePath))) {
+        continue;
+      }
+
+      await fs.mkdir(assetsDir, { recursive: true });
+      const targetImagePath = await getUniqueTargetPath(path.join(assetsDir, path.basename(mirroredImagePath)));
+      await fs.rename(mirroredImagePath, targetImagePath);
+
+      const repairedPath = toMarkdownPath(path.join('assets', path.basename(targetImagePath)));
+      const escapedRawPath = rawPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const linkRegex = new RegExp(`(!\\[[^\\]]*\\]\\()${escapedRawPath}(\\))`, 'g');
+      updatedContent = updatedContent.replace(linkRegex, `$1${repairedPath}$2`);
+      changed = true;
       continue;
     }
 

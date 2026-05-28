@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { getGitHubSession } from '../github/auth';
 import { runGit } from '../github/gitClient';
+import { getCurrentSyncHealthStatus } from './syncNotes';
 import { listNoteFiles } from '../storage/localStorage';
 import { resolveNotesPath } from '../utils/paths';
 import { logError } from '../utils/logger';
@@ -32,6 +33,7 @@ export function registerSyncStatusCommand(context: vscode.ExtensionContext): voi
 
         const accountLabel = session?.account.label ?? 'Not connected';
         const repoInfo = getConfiguredRepoInfo(session?.account.label ?? '');
+        const syncHealth = getCurrentSyncHealthStatus();
 
         const gitRoot = await readGitValue(notesPath, ['rev-parse', '--show-toplevel']);
         const currentBranch = await readGitValue(notesPath, ['branch', '--show-current']);
@@ -46,6 +48,9 @@ export function registerSyncStatusCommand(context: vscode.ExtensionContext): voi
           '# QuickNotes Sync Status',
           '',
           `- **GitHub Account**: ${accountLabel}`,
+          `- **Sync Health**: ${syncHealth.state}`,
+          `- **Recovery Hint**: ${syncHealth.detail || 'No hint available.'}`,
+          `- **Last Status Update**: ${syncHealth.updatedAt}`,
           `- **Configured Repo**: ${repoInfo.owner ? `${repoInfo.owner}/${repoInfo.repoName}` : repoInfo.repoName}`,
           `- **Configured Branch**: ${repoInfo.branch}`,
           `- **Notes Path**: \`${notesPath}\``,
