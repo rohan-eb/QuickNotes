@@ -47,6 +47,15 @@ function hasSameRepoIdentity(marker: RepoMarker | null, config: RepoConfig): boo
   );
 }
 
+async function hasLocalHead(repoPath: string): Promise<boolean> {
+  try {
+    await runGit(repoPath, ['rev-parse', '--verify', 'HEAD']);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function readRepoMarker(repoPath: string): Promise<RepoMarker | null> {
   const filePath = markerPath(repoPath);
   const raw = await fs.readFile(filePath, 'utf8').catch(() => '');
@@ -118,6 +127,10 @@ export async function writeRepoMarker(repoPath: string, config: RepoConfig): Pro
 export async function cleanupRepoMarkerIfOnlyInternalDrift(repoPath: string, config: RepoConfig): Promise<boolean> {
   const currentMarker = await readRepoMarker(repoPath);
   if (!hasSameRepoIdentity(currentMarker, config)) {
+    return false;
+  }
+
+  if (!(await hasLocalHead(repoPath))) {
     return false;
   }
 
