@@ -2,7 +2,7 @@
   "name": "quicknotes",
   "displayName": "QuickNotes",
   "description": "Quick Notes (QuickNotes) is a local-first VS Code notes extension with Markdown notes, private local notebooks, and optional cloud sync (GitHub or Google Drive).",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "publisher": "rohanvadsola",
   "icon": "media/marketplace.png",
   "license": "MIT",
@@ -32,7 +32,7 @@
     "vscode notes",
     "github notes",
     "sync notes",
-    "local first", 
+    "local first",
     "knowledge base",
     "scratchpad"
   ],
