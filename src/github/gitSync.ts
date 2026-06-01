@@ -185,6 +185,10 @@ async function abortRebase(repoPath: string): Promise<void> {
 async function pullWithRebase(repoPath: string, branch: string, token: string): Promise<void> {
   try {
     await runGitWithGitHubAuth(repoPath, ['fetch', 'origin', branch], token);
+    if (!(await hasLocalHead(repoPath))) {
+      await runGit(repoPath, ['checkout', '-B', branch, `origin/${branch}`]);
+      return;
+    }
     await runGit(repoPath, ['rebase', `origin/${branch}`]);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -349,8 +353,13 @@ async function commitAllPendingChanges(repoPath: string): Promise<boolean> {
 
     const deletedPaths = changedPaths.filter((changedPath) => !existingPaths.includes(changedPath));
     if (deletedPaths.length > 0) {
-      await runGit(repoPath, ['rm', '--cached', '--ignore-unmatch', '--', ...deletedPaths]).catch(() => undefined);
-      await runGit(repoPath, ['add', '-u', '--', '.']);
+      // On legacy repos stuck in an unborn branch state (no local HEAD yet),
+      // skip tracked-file index cleanup because commands like `git add -u`
+      // can fail with "Could not resolve HEAD to a revision".
+      if (await hasLocalHead(repoPath)) {
+        await runGit(repoPath, ['rm', '--cached', '--ignore-unmatch', '--', ...deletedPaths]).catch(() => undefined);
+        await runGit(repoPath, ['add', '-u', '--', '.']);
+      }
     }
   }
 
@@ -440,8 +449,8 @@ export async function syncNotesWithGitHub(session: AuthenticationSession): Promi
   if (!localHeadExists) {
     const branchExists = await remoteBranchExists(repoPath, config.branch, session.accessToken);
     if (branchExists) {
-      const hasWorktreeChanges = await hasAnyWorktreeChanges(repoPath);
-      if (!hasWorktreeChanges) {
+      const hasLocalSyncableChanges = await hasSyncableChanges(repoPath);
+      if (!hasLocalSyncableChanges) {
         await runGitWithGitHubAuth(repoPath, ['fetch', 'origin', config.branch], session.accessToken);
         await runGit(repoPath, ['checkout', '-B', config.branch, `origin/${config.branch}`]);
       }
@@ -468,6 +477,15 @@ export async function syncNotesWithGitHub(session: AuthenticationSession): Promi
     if (message.includes('cannot rebase') && message.includes('unstaged changes')) {
       hasLocalCommit = (await flushPendingChanges(repoPath)) || hasLocalCommit;
       await pullWithRebase(repoPath, config.branch, session.accessToken);
+    } else if (message.includes('could not resolve head to a revision')) {
+      const branchExists = await remoteBranchExists(repoPath, config.branch, session.accessToken);
+      if (branchExists) {
+        await runGitWithGitHubAuth(repoPath, ['fetch', 'origin', config.branch], session.accessToken);
+        await runGit(repoPath, ['checkout', '-B', config.branch, `origin/${config.branch}`]);
+        await pullWithRebase(repoPath, config.branch, session.accessToken);
+      } else {
+        throw error;
+      }
     } else {
       throw error;
     }

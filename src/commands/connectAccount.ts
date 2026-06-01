@@ -94,6 +94,7 @@ export async function connectAccountInteractive(
   }
 
   await activateConnectedSession(session);
+  await vscode.commands.executeCommand('devnotes.syncNotes');
 
   if (options?.successMessage) {
     vscode.window.showInformationMessage(options.successMessage.replace('{account}', session.account.label));
@@ -155,8 +156,6 @@ export function registerSwitchAccountCommand(context: vscode.ExtensionContext, n
         if (!session) {
           return;
         }
-
-        await vscode.commands.executeCommand('devnotes.syncNotes', { silent: true });
       } catch (error) {
         logError('Failed to switch account', error);
         const reason = error instanceof Error ? error.message : 'Unknown error';

@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.0.9] - 2026-06-01
+
+### Fixed
+
+- `.quicknotes-metadata.json` is now auto-ignored via local Git excludes so users do not see or manually push metadata-only file changes.
+- Added activation-time migration to apply local ignore rules for existing synced account repositories automatically.
+
+## [0.0.8] - 2026-05-29
+
+### Fixed
+
+- GitHub sync now auto-recovers account-scoped repos that have no local `HEAD` yet, preventing `Could not resolve HEAD to a revision` failures after connect/reconnect.
+- Sync bootstrap now attaches local account-scoped repos to existing remote branches more reliably before rebase.
+- Internal repo marker cleanup now safely skips unborn-`HEAD` repositories.
+- Account switch no longer triggers duplicate immediate sync runs.
+
 ## [0.0.7] - 2026-05-26
 
 ### Added
