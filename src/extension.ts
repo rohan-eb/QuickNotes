@@ -36,6 +36,7 @@ import { registerTogglePinCommand } from './commands/togglePin';
 import { ensureDirectory } from './storage/localStorage';
 import { NotesProvider } from './tree/notesProvider';
 import { getGitHubSession } from './github/auth';
+import { applyLocalSyncIgnoresMigration } from './github/repoManager';
 import { closeMissingTabsUnderDirectories, closeOpenTabForFile, closeOpenTabsUnderDirectory } from './utils/editorCleanup';
 import { initializeLogger, logError, logInfo } from './utils/logger';
 import { ensureSyncedNoteMetadata } from './utils/noteMetadata';
@@ -46,6 +47,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   try {
     await Promise.all([ensureDirectory(resolveSyncedNotesPath()), ensureDirectory(resolveLocalNotesPath())]);
+    await applyLocalSyncIgnoresMigration(resolveSyncedNotesBasePath());
 
     const notesProvider = new NotesProvider();
     const notesTreeView = vscode.window.createTreeView('devnotes.sidebar', { treeDataProvider: notesProvider });

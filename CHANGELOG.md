@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.0.9] - 2026-06-01
+
+### Fixed
+
+- `.quicknotes-metadata.json` is now auto-ignored via local Git excludes so users do not see or manually push metadata-only file changes.
+- Added activation-time migration to apply local ignore rules for existing synced account repositories automatically.
+
 ## [0.0.8] - 2026-05-29
 
 ### Fixed

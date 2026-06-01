@@ -64,6 +64,53 @@ async function ensureGitBootstrap(repoPath: string, config: RepoConfig): Promise
   }
 
   await ensureRemote(repoPath, config.remoteUrl);
+  await ensureLocalIgnoreRules(repoPath);
+}
+
+async function ensureLocalIgnoreRules(repoPath: string): Promise<void> {
+  const excludePath = path.join(repoPath, '.git', 'info', 'exclude');
+  const existing = await fs.readFile(excludePath, 'utf8').catch(() => '');
+  const requiredEntries = ['.quicknotes-metadata.json'];
+  const lines = new Set(
+    existing
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+  );
+
+  let changed = false;
+  for (const entry of requiredEntries) {
+    if (!lines.has(entry)) {
+      lines.add(entry);
+      changed = true;
+    }
+  }
+
+  if (!changed) {
+    return;
+  }
+
+  const nextContent = `${Array.from(lines).sort().join('\n')}\n`;
+  await fs.mkdir(path.dirname(excludePath), { recursive: true });
+  await fs.writeFile(excludePath, nextContent, 'utf8');
+}
+
+async function listAccountRepoCandidates(basePath: string): Promise<string[]> {
+  const accountsPath = path.join(basePath, 'accounts');
+  const accountEntries = await fs.readdir(accountsPath, { withFileTypes: true }).catch(() => []);
+  return accountEntries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => path.join(accountsPath, entry.name));
+}
+
+export async function applyLocalSyncIgnoresMigration(basePath: string): Promise<void> {
+  const candidates = [basePath, ...(await listAccountRepoCandidates(basePath))];
+
+  for (const candidate of candidates) {
+    if (await hasGitRepository(candidate)) {
+      await ensureLocalIgnoreRules(candidate);
+    }
+  }
 }
 
 async function githubRequest<T>(

@@ -4,7 +4,7 @@
 
 QuickNotes is a Markdown note-taking extension for developers who want a distraction-free, local-first workspace. Write notes in VS Code, keep them private on-device, or back them up through GitHub or Google Drive. No separate app. No context switching.
 
-[![Version](https://img.shields.io/badge/version-0.0.7-blue)](https://github.com/rohan-eb/QuickNotes)
+[![Version](https://img.shields.io/badge/version-0.0.9-blue)](https://github.com/rohan-eb/QuickNotes)
 [![VS Code](https://img.shields.io/badge/VS%20Code-1.90%2B-007acc)](https://code.visualstudio.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -47,6 +47,7 @@ Insert images directly into Markdown notes via the context menu. Images are stor
 - Retries automatically when connectivity is restored after going offline.
 - GitHub sync uses a **private** repository you own (QuickNotes can create it if missing).
 - Google Drive sync uses a dedicated `QuickNotes` folder under your account.
+- Internal metadata sidecar files are auto-ignored in local Git state, so users do not need to manually commit or push metadata-only changes.
 
 ---
 
