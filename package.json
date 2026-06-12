@@ -2,7 +2,7 @@
   "name": "quicknotes",
   "displayName": "QuickNotes",
   "description": "Quick Notes (QuickNotes) is a local-first VS Code notes extension with Markdown notes, private local notebooks, and optional cloud sync (GitHub or Google Drive).",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "publisher": "rohanvadsola",
   "icon": "media/marketplace.png",
   "license": "MIT",
@@ -196,10 +196,6 @@
         "title": "Duplicate Note"
       },
       {
-        "command": "devnotes.togglePin",
-        "title": "Quick Notes: Toggle Pin"
-      },
-      {
         "command": "devnotes.deleteNote",
         "title": "Delete Note"
       },
@@ -308,11 +304,6 @@
           "command": "devnotes.deleteNote",
           "when": "view == devnotes.sidebar && (viewItem == noteItem.synced || viewItem == noteItem.local)",
           "group": "navigation@5"
-        },
-        {
-          "command": "devnotes.togglePin",
-          "when": "view == devnotes.sidebar && (viewItem == noteItem.synced || viewItem == noteItem.local)",
-          "group": "navigation@3"
         },
         {
           "command": "devnotes.moveNoteToFolder",
@@ -445,10 +436,6 @@
         },
         {
           "command": "devnotes.moveNoteToFolder",
-          "when": "false"
-        },
-        {
-          "command": "devnotes.togglePin",
           "when": "false"
         },
         {

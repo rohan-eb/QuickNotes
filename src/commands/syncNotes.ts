@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { getGitHubSession } from '../github/auth';
-import { syncNotesWithGitHub } from '../github/gitSync';
+import { hasPendingGitHubWorktreeChanges, syncNotesWithGitHub } from '../github/gitSync';
 import { reconcileGoogleDriveSyncState, syncNotesWithGoogleDrive } from '../googleDrive/driveSync';
 import { getValidGoogleDriveAccessToken } from '../googleDrive/auth';
 import { isConflictBackupNotePath } from '../utils/conflictBackups';
@@ -299,11 +299,49 @@ function toUserFriendlySyncError(reason: string): string {
 let syncInFlight: Promise<void> | null = null;
 let queuedSyncRequested = false;
 let queuedSyncNeedsPrompt = false;
+let syncContextVersion = 0;
+let initialSyncTransitionActive = false;
 let currentSyncHealthStatus: SyncHealthStatus = {
   state: 'Offline',
   detail: 'Connect a sync provider to sync QuickNotes.',
   updatedAt: new Date(0).toISOString()
 };
+
+export function invalidateSyncContext(): void {
+  syncContextVersion += 1;
+  queuedSyncRequested = false;
+  queuedSyncNeedsPrompt = false;
+  initialSyncTransitionActive = false;
+}
+
+export function beginInitialSyncTransition(detail: string): void {
+  initialSyncTransitionActive = true;
+  setSyncHealthStatus('Syncing', detail);
+}
+
+export function endInitialSyncTransition(): void {
+  initialSyncTransitionActive = false;
+}
+
+export function isInitialSyncTransitionActive(): boolean {
+  return initialSyncTransitionActive;
+}
+
+export async function waitForCurrentSyncToFinish(): Promise<void> {
+  if (!syncInFlight) {
+    return;
+  }
+
+  try {
+    await syncInFlight;
+  } catch {
+    // Let callers continue with a fresh sync attempt even if the previous run failed.
+  }
+}
+
+function isSyncContextCurrent(version: number): boolean {
+  return version === syncContextVersion;
+}
 
 function setSyncHealthStatus(state: SyncHealthState, detail: string): void {
   currentSyncHealthStatus = {
@@ -346,7 +384,11 @@ function getSyncRecoveryHint(reason: string): { state: SyncHealthState; detail: 
   };
 }
 
-async function performSync(silent: boolean): Promise<void> {
+async function performSync(silent: boolean, contextVersion: number): Promise<void> {
+  if (!isSyncContextCurrent(contextVersion)) {
+    return;
+  }
+
   const localOnlyMode = vscode.workspace.getConfiguration().get<boolean>('devnotes.localOnlyMode', false);
   if (localOnlyMode) {
     setSyncHealthStatus('Offline', 'Local-only mode is enabled. Disable it to sync notes.');
@@ -373,6 +415,10 @@ async function performSync(silent: boolean): Promise<void> {
     accountLabel = session.account.label;
   }
 
+  if (!isSyncContextCurrent(contextVersion)) {
+    return;
+  }
+
   setSyncHealthStatus('Syncing', `Syncing QuickNotes with ${useGoogleDrive ? 'Google Drive' : 'GitHub'} for ${accountLabel}...`);
 
         await normalizeSyncedNoteMetadata();
@@ -387,6 +433,10 @@ async function performSync(silent: boolean): Promise<void> {
     vscode.window.showWarningMessage(
       `Sync warning: missing image file(s) in ${fileName}: ${brokenList}. QuickNotes will keep syncing the note text.`
     );
+  }
+
+  if (!isSyncContextCurrent(contextVersion)) {
+    return;
   }
 
   if (useGoogleDrive) {
@@ -411,6 +461,10 @@ async function performSync(silent: boolean): Promise<void> {
     await syncNotesWithGitHub(session);
   }
 
+  if (!isSyncContextCurrent(contextVersion)) {
+    return;
+  }
+
   // Post-sync normalization: downloaded remote notes can still contain legacy metadata blocks.
   // Run cleanup again after provider sync so markdown stays stable for users.
   await normalizeSyncedNoteMetadata();
@@ -419,6 +473,15 @@ async function performSync(silent: boolean): Promise<void> {
   await cleanupOrphanedAssetsImages();
   if (useGoogleDrive) {
     await reconcileGoogleDriveSyncState();
+  } else {
+    const session = await getGitHubSession(false);
+    if (session && isSyncContextCurrent(contextVersion) && (await hasPendingGitHubWorktreeChanges())) {
+      await syncNotesWithGitHub(session);
+    }
+  }
+
+  if (!isSyncContextCurrent(contextVersion)) {
+    return;
   }
 
   setSyncHealthStatus('Synced', `Last sync completed for ${accountLabel}.`);
@@ -427,13 +490,17 @@ async function performSync(silent: boolean): Promise<void> {
   }
 }
 
-async function runSyncWithQueue(initialSilent: boolean): Promise<void> {
+async function runSyncWithQueue(initialSilent: boolean, contextVersion: number): Promise<void> {
   let silent = initialSilent;
 
   while (true) {
+    if (!isSyncContextCurrent(contextVersion)) {
+      return;
+    }
+
     queuedSyncRequested = false;
     queuedSyncNeedsPrompt = false;
-    await performSync(silent);
+    await performSync(silent, contextVersion);
 
     if (!queuedSyncRequested) {
       return;
@@ -460,7 +527,8 @@ export function registerSyncNotesCommand(context: vscode.ExtensionContext): void
         return;
       }
 
-      syncInFlight = runSyncWithQueue(silent);
+      const contextVersion = syncContextVersion;
+      syncInFlight = runSyncWithQueue(silent, contextVersion);
 
       try {
         await syncInFlight;

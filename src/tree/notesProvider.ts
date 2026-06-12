@@ -2,12 +2,11 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as vscode from 'vscode';
 import { getGitHubSession } from '../github/auth';
-import { getCurrentSyncHealthStatus } from '../commands/syncNotes';
+import { getCurrentSyncHealthStatus, isInitialSyncTransitionActive } from '../commands/syncNotes';
 import { ensureDirectory } from '../storage/localStorage';
 import { isConflictBackupNoteName } from '../utils/conflictBackups';
-import { readNoteMetadata } from '../utils/noteMetadata';
 import { resolveLocalNotesPath, resolveSyncedNotesPath } from '../utils/paths';
-import { AccountItem, FolderItem, NoteItem, NoteSpace, PinnedGroupItem, SectionItem, SidebarItem, SpacerItem } from './noteItem';
+import { AccountItem, FolderItem, NoteItem, NoteSpace, SectionItem, SidebarItem, SpacerItem } from './noteItem';
 
 const ARCHIVE_DIRECTORY_NAME = '.quicknotes-archive';
 
@@ -56,9 +55,6 @@ export class NotesProvider implements vscode.TreeDataProvider<SidebarItem> {
     if (element instanceof SectionItem) {
       return this.getSectionChildren(element.space);
     }
-    if (element instanceof PinnedGroupItem) {
-      return this.getPinnedItemsForSpace(element.space);
-    }
     if (element instanceof FolderItem) {
       return this.getItemsForDirectory(element.space, element.fullPath);
     }
@@ -74,9 +70,10 @@ export class NotesProvider implements vscode.TreeDataProvider<SidebarItem> {
     const provider = config.get<string>('devnotes.syncProvider', 'github').trim();
     const driveToken = config.get<string>('devnotes.googleDriveAccessToken', '').trim();
     const syncedSpaceAvailable = this.isSyncedSpaceAvailable();
+    const hideSyncedNotes = syncedSpaceAvailable && isInitialSyncTransitionActive();
     const [session, syncedNotes, localNotes] = await Promise.all([
       localOnly ? Promise.resolve(undefined) : getGitHubSession(false),
-      syncedSpaceAvailable ? this.getNoteItemsForSpace('synced') : Promise.resolve([]),
+      syncedSpaceAvailable && !hideSyncedNotes ? this.getNoteItemsForSpace('synced') : Promise.resolve([]),
       this.getNoteItemsForSpace('local')
     ]);
     const syncConnected = provider === 'googleDrive'
@@ -118,9 +115,11 @@ export class NotesProvider implements vscode.TreeDataProvider<SidebarItem> {
     if (space === 'synced' && !this.isSyncedSpaceAvailable()) {
       return [];
     }
-    const pinnedItems = await this.getPinnedItemsForSpace(space);
+    if (space === 'synced' && isInitialSyncTransitionActive()) {
+      return [];
+    }
     const regularItems = await this.getNoteItemsForSpace(space);
-    return pinnedItems.length > 0 ? [new PinnedGroupItem(space), ...regularItems] : regularItems;
+    return regularItems;
   }
 
   private async getNoteItemsForSpace(space: NoteSpace): Promise<SidebarItem[]> {
@@ -155,17 +154,12 @@ export class NotesProvider implements vscode.TreeDataProvider<SidebarItem> {
       )
       .map(async (entry) => {
         const fullPath = path.join(dirPath, entry.name);
-        const { label, pinned, description } = await this.readNotePresentation(fullPath, entry.name);
-        return new NoteItem(label, entry.name, fullPath, space, pinned, description);
+        const { label, description } = await this.readNotePresentation(fullPath, entry.name);
+        return new NoteItem(label, entry.name, fullPath, space, description);
       });
 
-    const resolvedNotes = (await Promise.all(notes)).filter((item) => !item.pinned);
-    resolvedNotes.sort((a, b) => {
-      if (a.pinned !== b.pinned) {
-        return a.pinned ? -1 : 1;
-      }
-      return a.label.toString().localeCompare(b.label.toString());
-    });
+    const resolvedNotes = await Promise.all(notes);
+    resolvedNotes.sort((a, b) => a.label.toString().localeCompare(b.label.toString()));
 
     return [...folders, ...resolvedNotes];
   }
@@ -174,72 +168,17 @@ export class NotesProvider implements vscode.TreeDataProvider<SidebarItem> {
     return prefix || undefined;
   }
 
-  private async getPinnedItemsForSpace(space: NoteSpace): Promise<NoteItem[]> {
-    const rootPath = space === 'synced' ? resolveSyncedNotesPath() : resolveLocalNotesPath();
-    const results: NoteItem[] = [];
-
-    const visit = async (dirPath: string): Promise<void> => {
-      const entries = await fs.readdir(dirPath, { withFileTypes: true }).catch(() => []);
-
-      for (const entry of entries) {
-        if (entry.name === '.git' || entry.name === 'assets' || entry.name === 'accounts') {
-          continue;
-        }
-
-        const fullPath = path.join(dirPath, entry.name);
-        if (entry.isDirectory()) {
-          if (entry.name === ARCHIVE_DIRECTORY_NAME) {
-            continue;
-          }
-          await visit(fullPath);
-          continue;
-        }
-
-        if (!entry.isFile() || !entry.name.endsWith('.md') || isConflictBackupNoteName(entry.name)) {
-          continue;
-        }
-
-        const presentation = await this.readNotePresentation(fullPath, entry.name);
-        if (!presentation.pinned) {
-          continue;
-        }
-
-        const relativeDir = path.relative(rootPath, path.dirname(fullPath)).replace(/\\/g, '/');
-        const location = relativeDir && relativeDir !== '' ? relativeDir : undefined;
-        const description = this.formatDescription(location);
-        results.push(
-          new NoteItem(
-            presentation.label,
-            entry.name,
-            fullPath,
-            space,
-            true,
-            description
-          )
-        );
-      }
-    };
-
-    await ensureDirectory(rootPath);
-    await visit(rootPath);
-
-    results.sort((a, b) => a.label.toString().localeCompare(b.label.toString()));
-    return results;
-  }
-
-  private async readNotePresentation(fullPath: string, fileName: string): Promise<{ label: string; pinned: boolean; description?: string }> {
+  private async readNotePresentation(fullPath: string, fileName: string): Promise<{ label: string; description?: string }> {
     const baseLabel = fileName.replace(/\.md$/i, '');
     try {
-      const metadata = await readNoteMetadata(fullPath);
       return {
         label: baseLabel,
-        pinned: Boolean(metadata.pinned),
         description: undefined
       };
     } catch {
       // Fall back to the file name when the file cannot be read.
     }
 
-    return { label: baseLabel, pinned: false };
+    return { label: baseLabel };
   }
 }

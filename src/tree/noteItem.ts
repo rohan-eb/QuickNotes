@@ -9,7 +9,6 @@ export class NoteItem extends vscode.TreeItem {
     public readonly fileName: string,
     public readonly fullPath: string,
     public readonly space: NoteSpace,
-    public readonly pinned: boolean = false,
     descriptionText?: string
   ) {
     super(label, vscode.TreeItemCollapsibleState.None);
@@ -76,14 +75,6 @@ export class SectionItem extends vscode.TreeItem {
   }
 }
 
-export class PinnedGroupItem extends vscode.TreeItem {
-  constructor(public readonly space: NoteSpace) {
-    super('Pinned', vscode.TreeItemCollapsibleState.Expanded);
-    this.contextValue = `pinnedGroupItem.${space}`;
-    this.iconPath = new vscode.ThemeIcon('pinned');
-  }
-}
-
 export class SpacerItem extends vscode.TreeItem {
   constructor() {
     super(' ', vscode.TreeItemCollapsibleState.None);
@@ -97,5 +88,4 @@ export type SidebarItem =
   | ActionItem
   | AccountItem
   | SectionItem
-  | PinnedGroupItem
   | SpacerItem;

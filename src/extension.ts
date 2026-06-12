@@ -32,7 +32,6 @@ import { registerResetSyncedWarningCommand } from './commands/resetSyncedWarning
 import { registerSetupNoteHubCommand } from './commands/setupNoteHub';
 import { registerSyncNotesCommand } from './commands/syncNotes';
 import { registerSyncStatusCommand } from './commands/syncStatus';
-import { registerTogglePinCommand } from './commands/togglePin';
 import { ensureDirectory } from './storage/localStorage';
 import { NotesProvider } from './tree/notesProvider';
 import { getGitHubSession } from './github/auth';
@@ -162,7 +161,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     registerDeleteNoteCommand(context, notesProvider);
     registerDeleteFolderCommand(context, notesProvider);
     registerDuplicateNoteCommand(context, notesProvider);
-    registerTogglePinCommand(context, notesProvider);
     registerMoveNoteSpaceCommands(context, notesProvider);
     registerMoveNoteToFolderCommand(context, notesProvider);
     registerMoveFolderCommand(context, notesProvider);

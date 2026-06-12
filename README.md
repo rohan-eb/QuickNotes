@@ -4,7 +4,7 @@
 
 QuickNotes is a Markdown note-taking extension for developers who want a distraction-free, local-first workspace. Write notes in VS Code, keep them private on-device, or back them up through GitHub or Google Drive. No separate app. No context switching.
 
-[![Version](https://img.shields.io/badge/version-0.0.9-blue)](https://github.com/rohan-eb/QuickNotes)
+[![Version](https://img.shields.io/badge/version-0.0.10-blue)](https://github.com/rohan-eb/QuickNotes)
 [![VS Code](https://img.shields.io/badge/VS%20Code-1.90%2B-007acc)](https://code.visualstudio.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
