@@ -8,16 +8,22 @@ import {
   QUICKNOTES_REPO_MARKER,
   assertRepoMarkerMatches,
   cleanupRepoMarkerIfOnlyInternalDrift,
+  hideRepoMarkerFromGitStatus,
   writeRepoMarker
 } from './repoMarker';
 import { closeOpenTabForFile } from '../utils/editorCleanup';
 import { isConflictBackupNotePath } from '../utils/conflictBackups';
 
 const SYNCABLE_NOTE_EXTENSIONS = new Set(['.md', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp']);
+const SYNCABLE_INTERNAL_FILES = new Set(['.quicknotes-metadata.json']);
+const INTERNAL_BOOTSTRAP_FILES = [QUICKNOTES_REPO_MARKER, '.quicknotes-metadata.json'];
 
 function isSyncableNotesFile(filePath: string): boolean {
   if (path.basename(filePath) === QUICKNOTES_REPO_MARKER) {
     return false;
+  }
+  if (SYNCABLE_INTERNAL_FILES.has(path.basename(filePath))) {
+    return true;
   }
   if (isConflictBackupNotePath(filePath)) {
     return false;
@@ -110,6 +116,12 @@ async function sanitizeNestedAccountsInRepo(repoPath: string): Promise<void> {
   }
 
   await fs.rm(nestedAccountsPath, { recursive: true, force: true });
+}
+
+async function removeInternalBootstrapFiles(repoPath: string): Promise<void> {
+  for (const fileName of INTERNAL_BOOTSTRAP_FILES) {
+    await fs.rm(path.join(repoPath, fileName), { force: true }).catch(() => undefined);
+  }
 }
 
 async function safeReadStageBlob(repoPath: string, stage: '2' | '3', filePath: string): Promise<string> {
@@ -231,6 +243,21 @@ async function remoteBranchExists(repoPath: string, branch: string, token: strin
   return Boolean(result.stdout.trim());
 }
 
+async function hasSharedHistoryWithRemote(repoPath: string, branch: string): Promise<boolean> {
+  try {
+    await runGit(repoPath, ['merge-base', 'HEAD', `origin/${branch}`]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function alignRepoToRemoteBranch(repoPath: string, branch: string, token: string): Promise<void> {
+  await runGitWithGitHubAuth(repoPath, ['fetch', 'origin', branch], token);
+  await removeInternalBootstrapFiles(repoPath);
+  await runGit(repoPath, ['checkout', '-B', branch, `origin/${branch}`]);
+}
+
 async function hasLocalHead(repoPath: string): Promise<boolean> {
   try {
     await runGit(repoPath, ['rev-parse', '--verify', 'HEAD']);
@@ -271,50 +298,14 @@ async function hasSyncableChanges(repoPath: string): Promise<boolean> {
   return false;
 }
 
-async function listChangedSyncablePaths(repoPath: string): Promise<string[]> {
-  // Include all untracked files (not just directory placeholders) so staged
-  // path calculation includes note files within new folders.
-  const status = await runGit(repoPath, ['status', '--porcelain', '-z', '-uall']);
-  const records = status.stdout.split('\0').filter(Boolean);
-  const changedPaths: string[] = [];
-
-  for (let i = 0; i < records.length; i += 1) {
-    const record = records[i];
-    if (record.length < 4) {
-      continue;
-    }
-
-    const statusCode = record.slice(0, 2);
-    let filePath = record.slice(3);
-
-    const isRenameOrCopy =
-      statusCode[0] === 'R' || statusCode[0] === 'C' || statusCode[1] === 'R' || statusCode[1] === 'C';
-
-    if (isRenameOrCopy && i + 1 < records.length) {
-      const oldPath = filePath;
-      const newPath = records[i + 1];
-      i += 1;
-
-      if (isSyncableNotesFile(oldPath)) {
-        changedPaths.push(oldPath);
-      }
-      if (isSyncableNotesFile(newPath)) {
-        changedPaths.push(newPath);
-      }
-      continue;
-    }
-
-    if (isSyncableNotesFile(filePath)) {
-      changedPaths.push(filePath);
-    }
-  }
-
-  return [...new Set(changedPaths)];
-}
-
 async function hasAnyWorktreeChanges(repoPath: string): Promise<boolean> {
   const status = await runGit(repoPath, ['status', '--porcelain']);
   return status.stdout.trim().length > 0;
+}
+
+export async function hasPendingGitHubWorktreeChanges(): Promise<boolean> {
+  const repoPath = await ensureNotesDirectory();
+  return hasAnyWorktreeChanges(repoPath);
 }
 
 async function commitAllPendingChanges(repoPath: string): Promise<boolean> {
@@ -322,46 +313,10 @@ async function commitAllPendingChanges(repoPath: string): Promise<boolean> {
     return false;
   }
 
-  const changedPaths = await listChangedSyncablePaths(repoPath);
-  if (changedPaths.length === 0) {
-    return false;
-  }
-
-  try {
-    await runGit(repoPath, ['add', '-A', '--', ...changedPaths]);
-  } catch (error) {
-    const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-    if (!message.includes('pathspec')) {
-      throw error;
-    }
-
-    const existingPaths: string[] = [];
-    for (const changedPath of changedPaths) {
-      const absolutePath = path.join(repoPath, changedPath);
-      const exists = await fs
-        .access(absolutePath)
-        .then(() => true)
-        .catch(() => false);
-      if (exists) {
-        existingPaths.push(changedPath);
-      }
-    }
-
-    if (existingPaths.length > 0) {
-      await runGit(repoPath, ['add', '--', ...existingPaths]);
-    }
-
-    const deletedPaths = changedPaths.filter((changedPath) => !existingPaths.includes(changedPath));
-    if (deletedPaths.length > 0) {
-      // On legacy repos stuck in an unborn branch state (no local HEAD yet),
-      // skip tracked-file index cleanup because commands like `git add -u`
-      // can fail with "Could not resolve HEAD to a revision".
-      if (await hasLocalHead(repoPath)) {
-        await runGit(repoPath, ['rm', '--cached', '--ignore-unmatch', '--', ...deletedPaths]).catch(() => undefined);
-        await runGit(repoPath, ['add', '-u', '--', '.']);
-      }
-    }
-  }
+  // Stage the whole managed sync repo instead of trying to hand-pick paths.
+  // This repo only stores QuickNotes content plus app-managed metadata, and
+  // broad staging is more reliable for internal sidecar updates/deletions.
+  await runGit(repoPath, ['add', '-A', '--', '.']);
 
   try {
     await runGit(repoPath, ['commit', '-m', 'chore(notes): sync developer notes']);
@@ -442,7 +397,6 @@ export async function syncNotesWithGitHub(session: AuthenticationSession): Promi
   await abortRebase(repoPath);
   await sanitizeNestedAccountsInRepo(repoPath);
   const config = await ensureNotesRepository(session);
-  await assertRepoMarkerMatches(repoPath, config);
   await ensureCommitIdentity(repoPath, session.account.label, config.accountLogin);
 
   const localHeadExists = await hasLocalHead(repoPath);
@@ -451,14 +405,23 @@ export async function syncNotesWithGitHub(session: AuthenticationSession): Promi
     if (branchExists) {
       const hasLocalSyncableChanges = await hasSyncableChanges(repoPath);
       if (!hasLocalSyncableChanges) {
-        await runGitWithGitHubAuth(repoPath, ['fetch', 'origin', config.branch], session.accessToken);
-        await runGit(repoPath, ['checkout', '-B', config.branch, `origin/${config.branch}`]);
+        await alignRepoToRemoteBranch(repoPath, config.branch, session.accessToken);
       }
+    }
+  } else if (await remoteBranchExists(repoPath, config.branch, session.accessToken)) {
+    const hasSharedHistory = await hasSharedHistoryWithRemote(repoPath, config.branch);
+    if (!hasSharedHistory && !(await hasSyncableChanges(repoPath))) {
+      // Account-switched folders can inherit an unrelated local Git history.
+      // Realign that account-scoped repo to its own remote branch before sync.
+      await alignRepoToRemoteBranch(repoPath, config.branch, session.accessToken);
     }
   }
 
+  await assertRepoMarkerMatches(repoPath, config);
+
   await cleanupRepoMarkerIfOnlyInternalDrift(repoPath, config);
   await writeRepoMarker(repoPath, config);
+  await hideRepoMarkerFromGitStatus(repoPath);
 
   // Commit local markdown changes first so rebase pull never fails on unstaged edits/deletes.
   let hasLocalCommit = false;

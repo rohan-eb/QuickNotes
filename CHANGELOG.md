@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.0.10] - 2026-06-12
+
+### Fixed
+
+- Initial GitHub connect/switch flow now keeps synced notes hidden until the new account's first sync is ready, preventing stale notes from flashing in the sidebar.
+- Repeated disconnect/connect account switching now waits for in-flight sync work to settle before starting the next account handoff.
+- First post-connect sync no longer surfaces a false account connection failure when the account is already authenticated.
+- Synced note colors now stay consistent across browser and VS Code flows after sync.
+- Browser-authored synced image paths now resolve correctly in VS Code and GitHub previews.
+- Synced note edit flows now preserve and reload attached images more reliably.
+
+### Changed
+
+- Removed incomplete synced pin behavior from the active flow to avoid misleading non-functional UI/state.
+- Publish docs and release checklists now reflect the current packaging flow and generated release artifacts.
+
 ## [0.0.9] - 2026-06-01
 
 ### Fixed

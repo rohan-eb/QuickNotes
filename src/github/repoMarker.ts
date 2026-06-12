@@ -145,3 +145,9 @@ export async function cleanupRepoMarkerIfOnlyInternalDrift(repoPath: string, con
 
   return true;
 }
+
+export async function hideRepoMarkerFromGitStatus(repoPath: string): Promise<void> {
+  // The marker is app-managed state, not user content. Keep it out of normal
+  // worktree checks so account switches do not block sync/rebase.
+  await runGit(repoPath, ['update-index', '--skip-worktree', '--', QUICKNOTES_REPO_MARKER]).catch(() => undefined);
+}

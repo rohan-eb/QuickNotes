@@ -1,5 +1,11 @@
 import * as vscode from 'vscode';
 import { getGitHubSession } from '../github/auth';
+import {
+  beginInitialSyncTransition,
+  endInitialSyncTransition,
+  invalidateSyncContext,
+  waitForCurrentSyncToFinish
+} from './syncNotes';
 import { ensureDirectory } from '../storage/localStorage';
 import { NotesProvider } from '../tree/notesProvider';
 import { setActiveGitHubAccount } from '../utils/accountScope';
@@ -7,9 +13,14 @@ import { closeOpenTabsUnderDirectory } from '../utils/editorCleanup';
 import { logError } from '../utils/logger';
 import { resolveSyncedNotesPath } from '../utils/paths';
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function activateConnectedSession(
   session: vscode.AuthenticationSession
 ): Promise<void> {
+  invalidateSyncContext();
   const previousSyncedPath = resolveSyncedNotesPath();
   await setActiveGitHubAccount(session);
   await closeOpenTabsUnderDirectory(previousSyncedPath);
@@ -80,6 +91,33 @@ async function pickGitHubSession(
   });
 }
 
+async function runInitialSyncAfterConnect(
+  notesProvider: NotesProvider,
+  accountLabel: string
+): Promise<void> {
+  beginInitialSyncTransition(`Syncing QuickNotes with GitHub for ${accountLabel}...`);
+  notesProvider.refresh();
+
+  try {
+    await waitForCurrentSyncToFinish();
+
+    try {
+      await vscode.commands.executeCommand('devnotes.syncNotes', { silent: true });
+      return;
+    } catch (error) {
+      logError('Initial post-connect sync attempt failed', error);
+    }
+
+    await delay(1500);
+    await vscode.commands.executeCommand('devnotes.syncNotes', { silent: true });
+  } catch (error) {
+    logError('Retry post-connect sync attempt failed', error);
+  } finally {
+    endInitialSyncTransition();
+    notesProvider.refresh();
+  }
+}
+
 export async function connectAccountInteractive(
   notesProvider: NotesProvider,
   options?: { currentSession?: vscode.AuthenticationSession; successMessage?: string; cancelMessage?: string }
@@ -94,7 +132,8 @@ export async function connectAccountInteractive(
   }
 
   await activateConnectedSession(session);
-  await vscode.commands.executeCommand('devnotes.syncNotes');
+  notesProvider.refresh();
+  void runInitialSyncAfterConnect(notesProvider, session.account.label);
 
   if (options?.successMessage) {
     vscode.window.showInformationMessage(options.successMessage.replace('{account}', session.account.label));
@@ -178,6 +217,7 @@ export function registerDisconnectAccountCommand(context: vscode.ExtensionContex
           return;
         }
 
+        invalidateSyncContext();
         const config = vscode.workspace.getConfiguration();
         await config.update('devnotes.activeAccountKey', '', vscode.ConfigurationTarget.Global);
         await config.update('devnotes.activeAccountLabel', '', vscode.ConfigurationTarget.Global);
